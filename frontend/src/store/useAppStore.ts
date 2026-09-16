@@ -75,6 +75,12 @@ function loadTimelineMode(): TimelineMode {
 
 let graphRequest = 0
 
+/** The repo README at this tag, shown in the code pane while on the system view. */
+function readmeFile(files: FileEntry[]): OpenFile | null {
+  const f = files.find((x) => /^readme(\.(md|rst|txt|markdown))?$/i.test(x.path))
+  return f ? { path: f.path } : null
+}
+
 function newestGeneratedTag(tags: TagInfo[]): TagInfo | undefined {
   return [...tags].reverse().find((t) => t.has_graph)
 }
@@ -162,7 +168,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         tier = 2; moduleId = null
       }
     }
-    set({ graph, files, graphLoading: false, tier, systemId, moduleId, selectedNodeId: null, openFile: null, hoverRange: null, toast })
+    set({ graph, files, graphLoading: false, tier, systemId, moduleId, selectedNodeId: null, openFile: tier === 1 ? readmeFile(files) : null, hoverRange: null, toast })
     if (get().compareMode) void get().refreshCompare()
   },
 
@@ -193,7 +199,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   goToTier: (tier) => {
     const s = get()
-    if (tier === 1) set({ tier: 1, systemId: null, moduleId: null, selectedNodeId: null, openFile: null })
+    if (tier === 1) set({ tier: 1, systemId: null, moduleId: null, selectedNodeId: null, openFile: readmeFile(s.files) })
     else if (tier === 2 && s.systemId) set({ tier: 2, moduleId: null, selectedNodeId: null, openFile: null })
   },
 
