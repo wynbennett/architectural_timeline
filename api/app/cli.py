@@ -13,6 +13,13 @@ from .llm import generate as gen
 from .models import Repo, Tag
 
 
+def _redact(url: str) -> str:
+    """Hide credentials when echoing a database URL."""
+    import re
+
+    return re.sub(r"://([^:/@]+):[^@]+@", r"://\1:***@", url)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="app.cli")
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -26,8 +33,42 @@ def main(argv: list[str] | None = None) -> int:
 
     ls = sub.add_parser("list", help="list repos and tag status")
 
+    mg = sub.add_parser("migrate", help="create/upgrade the schema on a database (safe to re-run)")
+    mg.add_argument("--db", default=None, help="database URL (default: DATABASE_URL)")
+
+    sy = sub.add_parser("sync-to", help="copy repos, tags, graphs, inventories and summaries to another database")
+    sy.add_argument("target", help="target database URL, e.g. postgres://...")
+    sy.add_argument("--from", dest="source", default=None, help="source database URL (default: DATABASE_URL)")
+    sy.add_argument("--repo", default=None, help="only this repo, as owner/name")
+    sy.add_argument("--graphs-only", action="store_true", help="skip tags that have no graph")
+    sy.add_argument("--dry-run", action="store_true", help="report what would be copied")
+
     args = parser.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+
+    if args.cmd == "migrate":
+        from .config import Config
+        from .db import make_engine
+
+        url = args.db or Config.DATABASE_URL
+        engine = make_engine(url)
+        init_db(engine)
+        from sqlalchemy import inspect
+
+        print(f"schema ready on {_redact(url)}: tables={sorted(inspect(engine).get_table_names())}")
+        return 0
+
+    if args.cmd == "sync-to":
+        from .config import Config
+        from .sync import sync
+
+        source = args.source or Config.DATABASE_URL
+        report = sync(source, args.target, repo_filter=args.repo, dry_run=args.dry_run, graphs_only=args.graphs_only)
+        print(("dry run: " if args.dry_run else "synced: ") + str(report) + f"  ->  {_redact(args.target)}")
+        for item in report.skipped:
+            print("  skipped", item)
+        return 0
+
     init_db()
 
     if args.cmd == "list":

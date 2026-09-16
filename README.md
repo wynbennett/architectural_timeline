@@ -82,11 +82,29 @@ compute with `maxDuration` 300 s (the Hobby plan maximum). Python 3.12 is Vercel
 2. Environment variables: `DATABASE_URL` (from the store), `ANTHROPIC_API_KEY` (there is no
    browser login on a serverless function), `FILE_SOURCE=github`, and one of:
    - `GENERATION_MODE=chunked` to generate on Vercel (see below), or
-   - `GENERATION_MODE=off` for a view-only deployment populated from your machine:
+   - `GENERATION_MODE=off` for a view-only deployment populated from your machine.
 
-     ```bash
-     DATABASE_URL='postgres://...' make generate URL=https://github.com/owner/repo
-     ```
+   On Vercel (`VERCEL=1` is set by the platform) `FILE_SOURCE` defaults to `github` and
+   `GENERATION_MODE` to `chunked`, so only `DATABASE_URL` and `ANTHROPIC_API_KEY` are
+   strictly required. `POSTGRES_URL` is accepted as an alias for `DATABASE_URL`.
+
+### Migrating and syncing the Vercel database
+
+The schema is created on first request, but you can prepare it explicitly, and copy what
+you generated locally (sqlite) into Postgres. Pull the connection string with the Vercel
+CLI, then:
+
+```bash
+npx vercel env pull .env.vercel --environment=production   # DATABASE_URL_UNPOOLED is best for DDL
+DB=$(grep '^DATABASE_URL_UNPOOLED=' .env.vercel | cut -d= -f2- | tr -d '"')
+make migrate DB="$DB"                       # create/upgrade tables, safe to re-run
+make sync DB="$DB"                          # copy repos, tags, graphs, inventories, summaries
+make sync DB="$DB" REPO=psf/requests        # one repo only
+```
+
+The sync matches rows on natural keys (repo url, tag name, file path), replaces each tag's
+graph and inventory, never copies jobs, and is safe to re-run. Preview and production
+share one database unless you attach separate stores, so one sync serves both.
 
 File contents are never stored. Locally they come from the clone (`git show`); on
 Vercel from raw.githubusercontent.com by commit sha.

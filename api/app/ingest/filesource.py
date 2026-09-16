@@ -62,7 +62,18 @@ class ValidatedFileSource:
         return self.inner.read(owner, name, sha, path)
 
 
+class LocalThenGitHubFileSource:
+    """Local clone when it exists (fast, offline), otherwise GitHub raw. Lets a database synced
+    from another machine still show code for repos that were never cloned here."""
+
+    def __init__(self) -> None:
+        self.local, self.remote = LocalGitFileSource(), GitHubRawFileSource()
+
+    def read(self, owner: str, name: str, sha: str, path: str) -> str | None:
+        return self.local.read(owner, name, sha, path) or self.remote.read(owner, name, sha, path)
+
+
 def get_file_source() -> ValidatedFileSource:
     if Config.FILE_SOURCE == "github":
         return ValidatedFileSource(GitHubRawFileSource())
-    return ValidatedFileSource(LocalGitFileSource())
+    return ValidatedFileSource(LocalThenGitHubFileSource())

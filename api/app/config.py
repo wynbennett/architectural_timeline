@@ -23,18 +23,25 @@ def _bool(value: str | None, default: bool) -> bool:
     return value.strip().lower() in {"1", "true", "yes", "on"}
 
 
+# On Vercel there is no git binary and no clone, so the defaults flip to the GitHub-backed
+# modes. Explicit env vars always win.
+_ON_VERCEL = bool(os.environ.get("VERCEL"))
+
+
 class Config:
-    DATABASE_URL: str = os.environ.get("DATABASE_URL", "sqlite:///./data/dev.db")
+    DATABASE_URL: str = os.environ.get("DATABASE_URL") or os.environ.get("POSTGRES_URL") or "sqlite:///./data/dev.db"
     # Credentials are resolved by the Anthropic SDK itself (API key env var, bearer token,
     # or an `ant auth login` OAuth profile). Nothing is read here on purpose.
     # local   = git clone + background thread (default for `make dev`)
     # chunked = GitHub tarball + one time-boxed step per HTTP call (Vercel)
     # off     = view only
-    GENERATION_MODE: str = os.environ.get("GENERATION_MODE") or ("local" if _bool(os.environ.get("GENERATION_ENABLED"), True) else "off")
+    GENERATION_MODE: str = os.environ.get("GENERATION_MODE") or (
+        "chunked" if _ON_VERCEL else ("local" if _bool(os.environ.get("GENERATION_ENABLED"), True) else "off")
+    )
     GENERATION_ENABLED: bool = GENERATION_MODE != "off"
     STEP_BUDGET_S: float = float(os.environ.get("STEP_BUDGET_S", "150"))  # chunked mode: seconds of work per HTTP call
     REPO_CACHE_DIR: Path = Path(os.environ.get("REPO_CACHE_DIR", "./data/repos")).resolve()
-    FILE_SOURCE: str = os.environ.get("FILE_SOURCE", "local")  # local | github
+    FILE_SOURCE: str = os.environ.get("FILE_SOURCE") or ("github" if _ON_VERCEL else "local")  # local | github
     MODEL: str = os.environ.get("ARCH_MODEL", "claude-sonnet-5")
     TAGS_ON_LOAD: int = int(os.environ.get("TAGS_ON_LOAD", "3"))
     MAX_FILE_BYTES: int = int(os.environ.get("MAX_FILE_BYTES", str(100 * 1024)))
