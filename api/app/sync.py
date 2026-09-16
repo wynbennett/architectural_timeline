@@ -95,7 +95,7 @@ def sync(source_url: str, target_url: str, repo_filter: str | None = None, dry_r
                 dst.execute(delete(Graph).where(Graph.tag_id == tag.id))
                 dst.execute(delete(File).where(File.tag_id == tag.id))
                 dst.add(Graph(repo_id=repo.id, tag_id=tag.id, tier1=g.tier1, tier2=g.tier2, tier3=g.tier3, change_summary=g.change_summary, overview=g.overview, model=g.model, prompt_version=g.prompt_version, generated_at=g.generated_at))
-                dst.add_all([File(repo_id=repo.id, tag_id=tag.id, path=f.path, language=f.language, size=f.size) for f in src_tag.files])
+                dst.add_all([File(repo_id=repo.id, tag_id=tag.id, path=f.path, language=f.language, size=f.size, blob_sha=f.blob_sha) for f in src_tag.files])
                 report.graphs += 1
                 report.files += len(src_tag.files)
             # change summaries for tag pairs that exist on the target

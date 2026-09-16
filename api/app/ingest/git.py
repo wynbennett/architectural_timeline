@@ -103,6 +103,7 @@ def default_branch(repo: Path) -> str | None:
 class TreeEntry:
     path: str
     size: int
+    sha: str  # git blob id; identical content => identical sha, across clones and tarballs
 
 
 def ls_tree(repo: Path, sha: str) -> list[TreeEntry]:
@@ -132,7 +133,7 @@ def ls_tree(repo: Path, sha: str) -> list[TreeEntry]:
     entries: list[TreeEntry] = []
     for oid, paths in oids.items():
         for path in paths:
-            entries.append(TreeEntry(path=path, size=sizes.get(oid, -1)))
+            entries.append(TreeEntry(path=path, size=sizes.get(oid, -1), sha=oid))
     return entries
 
 

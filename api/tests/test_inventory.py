@@ -40,7 +40,9 @@ def test_dir_workspace(tmp_path):
     (tmp_path / "README.md").write_text("# x\n")
     (tmp_path / "logo.png").write_bytes(b"\x89PNG")
     ws = DirWorkspace(root=tmp_path, sha="abc")
-    assert sorted(p for p, _ in ws.list_files()) == ["README.md", "logo.png", "src/a.py"]
+    listed = {p: sha for p, _, sha in ws.list_files()}
+    assert sorted(listed) == ["README.md", "logo.png", "src/a.py"]
+    assert listed["src/a.py"] == "b917a726c93f902e43291d9009d6488385133b67"  # git's blob id for "print(1)\n"
     assert ws.read("src/a.py") == "print(1)\n"
     assert ws.read("../etc/passwd") == ""
     inv = build_inventory(ws)

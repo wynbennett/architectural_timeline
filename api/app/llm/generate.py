@@ -163,6 +163,19 @@ class TagContext:
     inv: Inventory
     prev_tag: str | None
     prev_graph: dict | None  # {"tier1":..., "tier2":..., "tier3":...}
+    prev_files: dict[str, str] | None = None  # path -> blob sha at the reference tag
+
+    def files_unchanged(self, paths: list[str]) -> bool:
+        """True when the inventory files under `paths` are the same set with identical content
+        as at the reference tag, so work done there can be reused verbatim."""
+        if not self.prev_files:
+            return False
+        cur = {f.path: f.sha for f in self.inv.under(paths)}
+        if not cur or any(not sha for sha in cur.values()):
+            return False
+        norm = [p.strip("/") for p in paths if p.strip("/")]
+        prev = {p: sha for p, sha in self.prev_files.items() if any(p == n or p.startswith(n + "/") for n in norm)}
+        return cur == prev
 
     @property
     def system_prompt(self) -> str:
@@ -291,9 +304,38 @@ def repair_tier2(g: Tier2Graph, inv: Inventory, system: SystemNode) -> Tier2Grap
     return Tier2Graph(nodes=nodes, edges=_repair_edges(g.edges, seen, f"tier2:{system.id}"))
 
 
+def _reusable_tier2(ctx: TagContext, system: SystemNode) -> Tier2Graph | None:
+    """The reference tag's modules for this system, when the system has the same paths and
+    none of its files changed."""
+    if not ctx.prev_graph:
+        return None
+    prev_sys = next((n for n in ctx.prev_graph["tier1"]["nodes"] if n["id"] == system.id), None)
+    if prev_sys is None or sorted(prev_sys.get("paths", [])) != sorted(system.paths) or system.id not in ctx.prev_graph["tier2"]:
+        return None
+    if not ctx.files_unchanged(system.paths):
+        return None
+    return Tier2Graph(**ctx.prev_graph["tier2"][system.id])
+
+
+def _reusable_tier3(ctx: TagContext, system: SystemNode, module: ModuleNode) -> Tier3Graph | None:
+    if not ctx.prev_graph:
+        return None
+    key = tier3_key(system.id, module.id)
+    prev_mod = next((m for m in ctx.prev_graph["tier2"].get(system.id, {}).get("nodes", []) if m["id"] == module.id), None)
+    if prev_mod is None or sorted(prev_mod.get("paths", [])) != sorted(module.paths) or key not in ctx.prev_graph["tier3"]:
+        return None
+    if not ctx.files_unchanged(module.paths):
+        return None
+    return Tier3Graph(**ctx.prev_graph["tier3"][key])
+
+
 def run_tier2(ctx: TagContext, system: SystemNode, siblings: list[SystemNode]) -> Tier2Graph:
     if system.kind == "external":
         return Tier2Graph(nodes=[], edges=[])  # not implemented in this repo; nothing to zoom into
+    reused = _reusable_tier2(ctx, system)
+    if reused is not None:
+        log.info("tier2 %s: unchanged since %s, reused", system.id, ctx.prev_tag)
+        return reused
     prompt = build_tier2_prompt(ctx, system, siblings)
     if prompt is None:
         return Tier2Graph(nodes=[], edges=[])
@@ -365,6 +407,10 @@ def repair_tier3(g: Tier3Graph, contents: dict[str, str], label: str) -> Tier3Gr
 
 
 def run_tier3(ctx: TagContext, system: SystemNode, module: ModuleNode) -> Tier3Graph:
+    reused = _reusable_tier3(ctx, system, module)
+    if reused is not None:
+        log.info("tier3 %s: unchanged since %s, reused", tier3_key(system.id, module.id), ctx.prev_tag)
+        return reused
     contents = _module_files(ctx, module)
     prompt = build_tier3_prompt(ctx, system, module, contents)
     if prompt is None:
@@ -433,14 +479,15 @@ def _build_ctx(repo_id: int, tag_id: int, state: dict) -> TagContext:
     with session_scope() as s:
         tag = s.get(Tag, tag_id)
         owner, name, tag_name, sha = tag.repo.owner, tag.repo.name, tag.name, tag.commit_sha
-        prev_tag, prev_graph = None, None
+        prev_tag, prev_graph, prev_files = None, None, None
         if state.get("prev_tag_id"):
             p = s.get(Tag, state["prev_tag_id"])
             if p is not None and p.graph is not None:
                 prev_tag, prev_graph = p.name, {"tier1": p.graph.tier1, "tier2": p.graph.tier2, "tier3": p.graph.tier3}
+                prev_files = {f.path: f.blob_sha for f in p.files if f.blob_sha}
     ws = open_workspace(owner, name, sha)
     inv = build_inventory(ws)
-    return TagContext(ws=ws, owner=owner, name=name, tag=tag_name, sha=sha, inv=inv, prev_tag=prev_tag, prev_graph=prev_graph)
+    return TagContext(ws=ws, owner=owner, name=name, tag=tag_name, sha=sha, inv=inv, prev_tag=prev_tag, prev_graph=prev_graph, prev_files=prev_files)
 
 
 def run_job_step(job_id: int, budget_s: float | None = None) -> bool:
@@ -498,7 +545,7 @@ def run_job_step(job_id: int, budget_s: float | None = None) -> bool:
                 ctx = _build_ctx(repo_id, tag_id, state)
                 with session_scope() as s:
                     s.execute(delete(File).where(File.tag_id == tag_id))
-                    s.add_all([File(repo_id=repo_id, tag_id=tag_id, path=f.path, language=f.language, size=f.size) for f in ctx.inv.files])
+                    s.add_all([File(repo_id=repo_id, tag_id=tag_id, path=f.path, language=f.language, size=f.size, blob_sha=f.sha or None) for f in ctx.inv.files])
                 state = {**state, "phase": "tier1"}
                 save(state, step="systems", progress=0.08, detail=f"{prefix}{tag_name}: identifying systems ({len(ctx.inv.files)} files)")
 
@@ -561,8 +608,23 @@ def run_job_step(job_id: int, budget_s: float | None = None) -> bool:
                     tag.status, tag.error = "done", None
                     repo_name = tag.repo.name
                 log.info("generated %s@%s: %d systems, %d modules, %d snippet groups", repo_name, tag_name, len(state["tier1"]["nodes"]), int(state.get("total_modules", 0)), len(state["tier3"]))
-                state = {"tags": tags, "idx": idx + 1, "force": force, "phase": "inventory"}
                 ctx = None
+                if idx == len(tags) - 1:
+                    # the newest tag of the job also gets its written overview
+                    state = {"tags": tags, "idx": idx, "force": force, "phase": "overview"}
+                    save(state, step="overview", progress=0.97, detail=f"{prefix}{tag_name}: writing overview")
+                else:
+                    state = {"tags": tags, "idx": idx + 1, "force": force, "phase": "inventory"}
+                    save(state, progress=1.0, detail=f"{prefix}{tag_name}: done")
+
+            elif phase == "overview":
+                from .overview import write_overview  # local import: overview imports this module
+
+                try:
+                    write_overview(tag_id, force=force)
+                except Exception as e:  # the graph is already saved; a failed overview must not fail the tag
+                    log.warning("overview for %s failed: %s", tag_name, e)
+                state = {"tags": tags, "idx": idx + 1, "force": force, "phase": "inventory"}
                 save(state, progress=1.0, detail=f"{prefix}{tag_name}: done")
 
             else:

@@ -51,6 +51,14 @@ cd api && .venv/bin/python -m app.cli generate https://github.com/vitejs/vite --
 
 ## Features
 
+- **Incremental generation**: each inventory row stores the file's git blob hash. When a
+  component or module has the same paths and byte-identical files as the nearest generated
+  tag, its modules or snippets are copied from that tag instead of calling the model, so a
+  patch release costs a fraction of a fresh tag. Run `app.cli rehash` once for inventories
+  created before hashing existed.
+- **Overview on load**: the newest tag of every generation job also gets its written
+  overview, so a freshly loaded repo opens with the diagram and the walkthrough.
+
 - **Three tiers**: system → module → code snippet. Click a node to zoom in; the breadcrumb zooms out.
 - **Time machine**: a slider over every tag. Drag to an ungenerated tag and press Generate.
 - **Compare mode**: press *compare* in the header. The slider grows a second thumb for the

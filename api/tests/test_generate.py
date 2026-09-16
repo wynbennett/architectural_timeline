@@ -77,3 +77,40 @@ def test_step_machine_resumes(monkeypatch, seeded_repo, fixture_repo):
         assert job.status == "done" and job.progress == 1.0
         tag = s.get(Tag, tag_id)
         assert tag.status == "done" and "api-service" in tag.graph.tier2
+
+
+def test_unchanged_components_are_reused(monkeypatch, seeded_repo, fixture_repo):
+    """v0.2.0 regenerated with v0.1.0 as reference: api/ is byte-identical between the tags,
+    so its modules and snippets come from v0.1.0 without model calls; worker/ is new."""
+    from unittest.mock import patch as _patch
+    from tests.conftest import fake_structured_call
+    from app.llm import overview as overview_mod
+    from app.schemas import Overview
+
+    monkeypatch.setattr(git, "repo_dir", lambda owner, name: fixture_repo)
+    with session_scope() as s:
+        repo = s.scalar(select(Repo).where(Repo.url == "https://github.com/acme/demo"))
+        tag_id = next(t.id for t in repo.tags if t.name == "v0.2.0")
+        repo_id = repo.id
+        assert all(f.blob_sha for t in repo.tags for f in t.files), "inventories carry blob hashes"
+
+    calls: list[str] = []
+
+    def counting(system, user, output_type, **kw):
+        calls.append(output_type.__name__)
+        return fake_structured_call(system, user, output_type, **kw)
+
+    job_id = gen.create_job(repo_id, [tag_id], force=True)
+    with _patch.object(gen, "structured_call", side_effect=counting), \
+         _patch.object(overview_mod, "structured_call", return_value=Overview(markdown="# overview")) as ov:
+        gen.run_job(job_id)
+
+    assert calls.count("Tier1Graph") == 1
+    assert calls.count("Tier2Graph") == 1   # worker only; api-service reused, db has no files
+    assert calls.count("Tier3Graph") == 1   # worker/core only; api-service/core reused
+    assert ov.call_count == 1               # newest tag of the job gets its overview
+    with session_scope() as s:
+        tag = s.get(Tag, tag_id)
+        assert tag.graph.overview == "# overview"
+        assert [m["id"] for m in tag.graph.tier2["api-service"]["nodes"]] == ["core"]
+        assert tag.graph.tier3["api-service/core"]["nodes"][0]["id"] == "index"

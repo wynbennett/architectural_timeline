@@ -79,6 +79,7 @@ class InventoryFile:
     path: str
     size: int
     language: str | None
+    sha: str = ""  # git blob id; "" when unknown
 
 
 @dataclass
@@ -117,8 +118,8 @@ class Inventory:
 def build_inventory(ws: Workspace, max_bytes: int | None = None) -> Inventory:
     max_bytes = max_bytes or Config.MAX_FILE_BYTES
     files = [
-        InventoryFile(path=path, size=size, language=language_for(path))
-        for path, size in ws.list_files()
+        InventoryFile(path=path, size=size, language=language_for(path), sha=sha)
+        for path, size, sha in ws.list_files()
         if not is_excluded(path, size, max_bytes)
     ]
     files.sort(key=lambda f: f.path)

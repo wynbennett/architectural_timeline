@@ -106,8 +106,12 @@ def seeded_repo(fixture_repo) -> int:
         s.add(repo)
         s.flush()
         repo_id = repo.id
+    from app.llm import overview as overview_mod
+    from app.schemas import Overview
+
     with patch.object(git, "clone_or_fetch", lambda url: fixture_repo), patch.object(git, "repo_dir", lambda owner, name: fixture_repo), \
-         patch.object(gen, "structured_call", side_effect=fake_structured_call):
+         patch.object(gen, "structured_call", side_effect=fake_structured_call), \
+         patch.object(overview_mod, "structured_call", return_value=Overview(markdown="# seeded overview")):
         gen.load_repo(repo_id)
         gen.generate_newest(repo_id, n=2)
     return repo_id

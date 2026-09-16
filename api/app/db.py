@@ -47,7 +47,7 @@ def init_db(target_engine=None) -> None:
     from sqlalchemy import inspect, text
 
     insp = inspect(eng)
-    for table, column, ddl_type in (("generation_jobs", "state", "JSON"), ("graphs", "overview", "TEXT")):
+    for table, column, ddl_type in (("generation_jobs", "state", "JSON"), ("graphs", "overview", "TEXT"), ("files", "blob_sha", "VARCHAR(64)")):
         if column not in {c["name"] for c in insp.get_columns(table)}:
             with eng.begin() as conn:
                 conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {ddl_type}"))

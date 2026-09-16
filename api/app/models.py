@@ -90,6 +90,7 @@ class File(Base):
     path: Mapped[str] = mapped_column(String(1024))
     language: Mapped[str | None] = mapped_column(String(32), nullable=True)
     size: Mapped[int] = mapped_column(Integer)
+    blob_sha: Mapped[str | None] = mapped_column(String(64), nullable=True)  # lets a later tag reuse unchanged work
 
     tag: Mapped[Tag] = relationship(back_populates="files")
 

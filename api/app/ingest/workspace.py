@@ -5,6 +5,7 @@ DirWorkspace  - an extracted GitHub tarball under a temp dir.            chunked
 """
 from __future__ import annotations
 
+import hashlib
 import io
 import os
 import tarfile
@@ -22,8 +23,16 @@ from . import git
 class Workspace(Protocol):
     sha: str
 
-    def list_files(self) -> list[tuple[str, int]]: ...  # (path, size); size -1 when unavailable
+    def list_files(self) -> list[tuple[str, int, str]]: ...  # (path, size, blob sha); size -1 when unavailable
     def read(self, path: str) -> str: ...
+
+
+def git_blob_sha(data: bytes) -> str:
+    """The id git would give this content, so tarball and clone inventories agree."""
+    h = hashlib.sha1()
+    h.update(f"blob {len(data)}\0".encode())
+    h.update(data)
+    return h.hexdigest()
 
 
 @dataclass
@@ -31,8 +40,8 @@ class GitWorkspace:
     repo_path: Path
     sha: str
 
-    def list_files(self) -> list[tuple[str, int]]:
-        return [(e.path, e.size) for e in git.ls_tree(self.repo_path, self.sha)]
+    def list_files(self) -> list[tuple[str, int, str]]:
+        return [(e.path, e.size, e.sha) for e in git.ls_tree(self.repo_path, self.sha)]
 
     def read(self, path: str) -> str:
         try:
@@ -46,15 +55,19 @@ class DirWorkspace:
     root: Path
     sha: str
 
-    def list_files(self) -> list[tuple[str, int]]:
-        out: list[tuple[str, int]] = []
+    def list_files(self) -> list[tuple[str, int, str]]:
+        out: list[tuple[str, int, str]] = []
+        cap = Config.MAX_FILE_BYTES
         for dirpath, dirnames, filenames in os.walk(self.root):
             dirnames[:] = [d for d in dirnames if d != ".git"]
             for f in filenames:
                 full = Path(dirpath) / f
-                if full.is_symlink():
+                if full.is_symlink() or full.name == ".complete":
                     continue
-                out.append((full.relative_to(self.root).as_posix(), full.stat().st_size))
+                size = full.stat().st_size
+                # hash only what the inventory can include; large files are excluded anyway
+                sha = git_blob_sha(full.read_bytes()) if 0 < size <= cap else ""
+                out.append((full.relative_to(self.root).as_posix(), size, sha))
         return out
 
     def read(self, path: str) -> str:
