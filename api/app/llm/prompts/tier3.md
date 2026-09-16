@@ -1,0 +1,25 @@
+Repository {owner}/{name} at tag {tag}.
+You are now zooming into ONE module:
+
+  {system_name} › {module_name} (id: {module_id})
+  {module_description}
+
+<files>
+{files}
+</files>
+
+<previous_tag_snippets tag="{prev_tag}">
+{previous_snippets}
+</previous_tag_snippets>
+
+Choose the code a reader should look at to understand how this module works: its entry
+points, the core functions or classes, and the places where it calls into other modules or
+external systems. Aim for 4 to 12 snippets.
+
+Each snippet is one contiguous range in one file: `file_path`, `start_line`, `end_line`
+(inclusive, using the line numbers shown). A snippet is a meaningful unit a reader would
+study: a function, a class, a route handler, a configuration block. Typically 5 to 60 lines,
+never more than about 80. Do not make snippets out of import lines, single constants, or
+one-line statements; fold those into the unit that uses them. Give each snippet a short
+title and a description that explains what the code does and why it matters here. Add
+edges between snippets where one calls or depends on another.

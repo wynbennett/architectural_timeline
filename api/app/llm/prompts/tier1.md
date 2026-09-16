@@ -1,0 +1,35 @@
+Repository {owner}/{name} at tag {tag} (commit {sha}).
+{prev_context_sentence}
+
+<directory_tree>
+{directory_tree}
+</directory_tree>
+
+<manifests>
+{manifests}
+</manifests>
+
+<readme>
+{readme}
+</readme>
+
+<entrypoints>
+{entrypoints}
+</entrypoints>
+
+<previous_tag_components tag="{prev_tag}">
+{previous_components}
+</previous_tag_components>
+
+Identify the system-level components: the separately deployable or runnable units and the
+external things they depend on. Use `kind` from: api, service, frontend, worker, datastore,
+external. If the repository is a single deployable, still separate its major runtime
+concerns when they are distinct (for example an HTTP API, a background worker, and the
+database it owns). Aim for 3 to 10 nodes.
+
+For each node give a name, a two-sentence description, and the directory prefixes that
+implement it in `paths`. Components of kind `external` or `datastore` are not implemented
+in this repository: give them an empty `paths` list (or only the config file that declares
+them, such as a compose file), and keep the code that talks to them under the component
+that owns that code. Then give the edges between nodes. Finally, write a short paragraph
+describing the system as a whole in `summary`.

@@ -1,0 +1,26 @@
+Repository {owner}/{name} at tag {tag}.
+You are now zooming into ONE system component:
+
+  {system_name} (id: {system_id}, kind: {system_kind})
+  {system_description}
+  paths: {system_paths}
+
+The other components in this system, for reference when a module talks outward:
+{sibling_components}
+
+<files>
+{files}
+</files>
+
+<previous_tag_modules tag="{prev_tag}">
+{previous_modules}
+</previous_tag_modules>
+
+Break this component into modules: cohesive groups of files with a single responsibility
+(for example routing, auth, persistence, billing, config). Aim for 3 to 12 modules. Assign
+each meaningful source file to exactly one module through `paths`; tests, fixtures, and
+generated files may be left out. Give each module a name and a two-sentence description.
+
+Add edges for the dependencies between these modules (imports or calls). If a module is the
+one that talks to another system component, note that in its description rather than as an
+edge.

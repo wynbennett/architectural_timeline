@@ -1,0 +1,7 @@
+api/.venv
+api/data
+api/tests
+api/.pytest_cache
+frontend/node_modules
+frontend/dist
+data
