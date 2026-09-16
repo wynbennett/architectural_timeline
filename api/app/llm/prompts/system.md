@@ -8,9 +8,10 @@ exhaustive list; the reader is trying to understand the shape of the system, not
 
 Identifiers:
 - `id` is a lowercase kebab-case slug derived from the name (e.g. "auth-service").
-- When a "previous tag" component list is provided, reuse the exact same id for any
-  component that still exists in this tag, even if it was renamed or moved. Mint a new id
-  only for something genuinely new. This is how the tool shows change over time.
+- When a neighboring tag's component list is provided (an earlier or later tag that was
+  already analyzed), reuse the exact same id for any component that also exists in this
+  tag, even if it was renamed or moved. Mint a new id only for something genuinely new.
+  This is how the tool shows change over time.
 - Every entry in `paths` must be a file path or directory prefix that appears in the
   inventory you are given. Do not invent paths.
 - Paths partition the code: a file belongs to exactly one component. Never list the same

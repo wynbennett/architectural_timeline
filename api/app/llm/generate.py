@@ -186,10 +186,10 @@ def build_tier1_prompt(ctx: TagContext) -> str:
             {"id": n["id"], "name": n["name"], "kind": n["kind"], "paths": n["paths"]}
             for n in ctx.prev_graph["tier1"]["nodes"]
         ]
-        prev_sentence = f"The previous analyzed tag was {ctx.prev_tag}; its components are listed below."
+        prev_sentence = f"A neighboring tag, {ctx.prev_tag}, was already analyzed; its components are listed below. Reuse its ids for components that also exist here."
         prev_json = json.dumps(prev_nodes, indent=1)
     else:
-        prev_sentence = "This is the oldest tag being analyzed; there is no previous component list."
+        prev_sentence = "No neighboring tag has been analyzed yet; there is no component list to align with."
         prev_json = "none"
     return render(
         load_prompt("tier1"),
@@ -409,6 +409,8 @@ def run_job(job_id: int) -> None:
 
 
 def _previous_graph_id(s, repo_id: int, order_index: int) -> int | None:
+    """Nearest generated tag to use as the id reference: the closest earlier one, or, when
+    generating an older tag after newer ones exist, the closest later one."""
     prev = s.scalar(
         select(Tag)
         .join(Graph, Graph.tag_id == Tag.id)
@@ -416,6 +418,14 @@ def _previous_graph_id(s, repo_id: int, order_index: int) -> int | None:
         .order_by(Tag.order_index.desc())
         .limit(1)
     )
+    if prev is None:
+        prev = s.scalar(
+            select(Tag)
+            .join(Graph, Graph.tag_id == Tag.id)
+            .where(Tag.repo_id == repo_id, Tag.order_index > order_index)
+            .order_by(Tag.order_index.asc())
+            .limit(1)
+        )
     return prev.id if prev is not None else None
 
 
