@@ -24,7 +24,6 @@ input:focus, textarea:focus, select:focus { outline: none; border-color: var(--a
 .repo-controls { display: flex; gap: 8px; align-items: center; flex: 1; }
 .repo-form { display: flex; gap: 6px; }
 .repo-form input { width: 320px; }
-.repo-form input.pattern-input { width: 170px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
 .timeline-bar { border-bottom: 1px solid var(--border); background: var(--bg-2); padding: 6px 18px 14px; }
 .timeline-label { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
 .timeline-title { color: var(--muted); text-transform: uppercase; font-size: 11px; letter-spacing: 0.08em; }

@@ -35,7 +35,7 @@ interface AppState {
   overviewBusy: boolean
 
   init: () => Promise<void>
-  loadRepo: (url: string, tagPattern?: string) => Promise<void>
+  loadRepo: (url: string) => Promise<void>
   selectRepo: (id: number) => Promise<void>
   selectTag: (name: string) => Promise<void>
   generateTag: (name: string) => Promise<void>
@@ -131,10 +131,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
 
-  loadRepo: async (url, tagPattern) => {
+  loadRepo: async (url) => {
     set({ error: null })
     try {
-      const { repo_id, job_id } = await api.createRepo(url, tagPattern)
+      const { repo_id, job_id } = await api.createRepo(url)
       const repo = await api.getRepo(repo_id)
       set({ repo, currentTag: null, graph: null, files: [], tier: 1, systemId: null, moduleId: null, selectedNodeId: null, openFile: null, chat: [], compareMode: false, compareTag: null, compareGraph: null, compare: null })
       startPolling(job_id)

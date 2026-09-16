@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import re
-
 from flask import Blueprint, abort, jsonify, request
 from sqlalchemy import select
 
@@ -62,13 +60,7 @@ def create_repo():
             s.add(repo)
             s.flush()
         repo_id = repo.id
-    pattern = (body.get("tag_pattern") or "").strip() or None
-    if pattern:
-        try:
-            re.compile(pattern)
-        except re.error as e:
-            return jsonify({"error": f"bad tag_pattern: {e}"}), 400
-    job_id = runner.enqueue_repo_load(repo_id, n_tags=int(body.get("tags") or Config.TAGS_ON_LOAD), tag_pattern=pattern)
+    job_id = runner.enqueue_repo_load(repo_id, n_tags=int(body.get("tags") or Config.TAGS_ON_LOAD))
     return jsonify({"repo_id": repo_id, "job_id": job_id}), 202
 
 

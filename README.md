@@ -42,8 +42,8 @@ make generate URL=https://github.com/owner/repo TAGS=3
 cd api && .venv/bin/python -m app.cli list
 ```
 
-Repos with pre-release or per-package tags (monorepos) need a tag filter so the newest
-three tags form one release train. Pass a regex in the UI's "tag regex" box or on the CLI:
+Repos with pre-release or per-package tags (monorepos) may need a tag filter so the newest
+three tags form one release train; the CLI takes a regex:
 
 ```bash
 cd api && .venv/bin/python -m app.cli generate https://github.com/vitejs/vite --tags 3 --tag-pattern '^v[0-9]+\.[0-9]+\.[0-9]+$'

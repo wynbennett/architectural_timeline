@@ -13,8 +13,8 @@ export const api = {
   health: () => fetch('/api/health').then(json<Health>),
   listRepos: () => fetch('/api/repos').then(json<RepoSummary[]>),
   getRepo: (id: number) => fetch(`/api/repos/${id}`).then(json<RepoDetail>),
-  createRepo: (url: string, tagPattern?: string) =>
-    fetch('/api/repos', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url, tag_pattern: tagPattern || undefined }) }).then(json<{ repo_id: number; job_id: number }>),
+  createRepo: (url: string) =>
+    fetch('/api/repos', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }) }).then(json<{ repo_id: number; job_id: number }>),
   generateTag: (repoId: number, tag: string) =>
     fetch(`/api/repos/${repoId}/tags/${encodeURIComponent(tag)}/generate`, { method: 'POST' }).then(json<{ job_id: number }>),
   getJob: (id: number) => fetch(`/api/jobs/${id}`).then(json<Job>),

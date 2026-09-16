@@ -11,7 +11,6 @@ import { CompareBanner } from '../timeline/CompareBanner'
 export function AppShell() {
   const { init, health, repos, repo, loadRepo, selectRepo, error, toast, dismissToast, job, compareMode, toggleCompareMode, graph } = useAppStore()
   const [url, setUrl] = useState('')
-  const [pattern, setPattern] = useState('')
 
   useEffect(() => { void init() }, [init])
   useEffect(() => { if (toast) { const t = window.setTimeout(dismissToast, 4000); return () => window.clearTimeout(t) } }, [toast, dismissToast])
@@ -28,9 +27,8 @@ export function AppShell() {
             </select>
           )}
           {health?.generation_enabled && (
-            <form className="repo-form" onSubmit={(e) => { e.preventDefault(); if (url.trim()) { void loadRepo(url.trim(), pattern.trim()); setUrl('') } }}>
+            <form className="repo-form" onSubmit={(e) => { e.preventDefault(); if (url.trim()) { void loadRepo(url.trim()); setUrl('') } }}>
               <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://github.com/owner/repo" />
-              <input className="pattern-input" value={pattern} onChange={(e) => setPattern(e.target.value)} placeholder="tag regex (optional)" title="Only tags matching this regex are generated, e.g. ^v\d+\.\d+\.\d+$ to skip betas and per-package tags" />
               <button className="btn primary" type="submit" disabled={!url.trim()}>Load</button>
             </form>
           )}
