@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import Slider from 'rc-slider'
-import { useAppStore } from '../../store/useAppStore'
+import { useAppStore, visibleTags, type TimelineMode } from '../../store/useAppStore'
 import type { TagInfo } from '../../types/graph'
 
 function statusGlyph(t: TagInfo): { glyph: string; cls: string } {
@@ -11,10 +11,18 @@ function statusGlyph(t: TagInfo): { glyph: string; cls: string } {
 }
 
 export function TimeSlider() {
-  const { repo, currentTag, selectTag, compareMode, compareTag, setCompareTag } = useAppStore()
-  const tags = repo?.tags ?? []
+  const { repo, currentTag, selectTag, compareMode, compareTag, setCompareTag, timelineMode, setTimelineMode } = useAppStore()
+  const allTags = repo?.tags ?? []
+  // Only the tags in scope are slider stops, spaced evenly, so the thumb always lands on a tag.
+  const tags = useMemo(() => visibleTags(allTags, timelineMode, [currentTag, compareTag]), [allTags, timelineMode, currentTag, compareTag])
   const currentIdx = Math.max(0, tags.findIndex((t) => t.name === currentTag))
   const compareIdx = compareTag ? Math.max(0, tags.findIndex((t) => t.name === compareTag)) : Math.max(0, currentIdx - 1)
+  const generatedCount = allTags.filter((t) => t.has_graph).length
+  const modes: { id: TimelineMode; label: string; count: number }[] = [
+    { id: 'generated', label: 'generated', count: generatedCount },
+    { id: 'recent', label: 'recent', count: visibleTags(allTags, 'recent', []).length },
+    { id: 'all', label: 'all', count: allTags.length },
+  ]
   const [dragIdx, setDragIdx] = useState<number | null>(null)
   const shownIdx = dragIdx ?? currentIdx
   const shown = tags[shownIdx]
@@ -36,12 +44,26 @@ export function TimeSlider() {
   }, [tags, shownIdx, compareMode, compareIdx])
 
   if (!repo) return <div className="timeline timeline-empty">time machine: load a repo to see its tags</div>
-  if (tags.length === 0) return <div className="timeline timeline-empty">no tags in {repo.owner}/{repo.name}</div>
+  if (allTags.length === 0) return <div className="timeline timeline-empty">no tags in {repo.owner}/{repo.name}</div>
 
   return (
     <div className="timeline">
       <div className="timeline-label">
         <span className="timeline-title">time machine</span>
+        <span className="timeline-scope">
+          {modes.map((m) => (
+            <button key={m.id} className={`scope-btn${timelineMode === m.id ? ' active' : ''}`} onClick={() => setTimelineMode(m.id)} title={`show ${m.label} tags`}>
+              {m.label} <span className="muted">{m.count}</span>
+            </button>
+          ))}
+          <select className="tag-jump" value="" onChange={(e) => { if (e.target.value) void selectTag(e.target.value) }} title="jump to any tag">
+            <option value="">jump to tag…</option>
+            {[...allTags].reverse().map((t) => (
+              <option key={t.name} value={t.name}>{t.has_graph ? '● ' : '○ '}{t.name}</option>
+            ))}
+          </select>
+          {tags.length < allTags.length && <span className="muted">{allTags.length - tags.length} hidden</span>}
+        </span>
         {shown && (
           <span className="timeline-current">
             <strong>{shown.name}</strong>

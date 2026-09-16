@@ -30,6 +30,7 @@ interface AppState {
   compare: CompareResult | null
   compareNote: string | null
   summarizing: boolean
+  timelineMode: TimelineMode
 
   init: () => Promise<void>
   loadRepo: (url: string, tagPattern?: string) => Promise<void>
@@ -51,6 +52,25 @@ interface AppState {
   setCompareTag: (name: string) => Promise<void>
   refreshCompare: () => Promise<void>
   summarizeCompare: () => Promise<void>
+  setTimelineMode: (m: TimelineMode) => void
+}
+
+export type TimelineMode = 'generated' | 'recent' | 'all'
+export const RECENT_TAGS = 12
+
+/** Tags shown on the slider for a mode. Always keeps the current/compare tags visible. */
+export function visibleTags(tags: TagInfo[], mode: TimelineMode, keep: (string | null)[]): TagInfo[] {
+  if (mode === 'all') return tags
+  const keepSet = new Set(keep.filter(Boolean) as string[])
+  const interesting = (t: TagInfo) => t.has_graph || t.status === 'running' || t.status === 'queued' || t.status === 'failed' || keepSet.has(t.name)
+  if (mode === 'generated') return tags.filter(interesting)
+  const recentFrom = Math.max(0, tags.length - RECENT_TAGS)
+  return tags.filter((t, i) => i >= recentFrom || interesting(t))
+}
+
+function loadTimelineMode(): TimelineMode {
+  try { const v = localStorage.getItem('timelineMode'); if (v === 'generated' || v === 'recent' || v === 'all') return v } catch { /* ignore */ }
+  return 'recent'
 }
 
 let graphRequest = 0
@@ -86,6 +106,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   compare: null,
   compareNote: null,
   summarizing: false,
+  timelineMode: loadTimelineMode(),
 
   init: async () => {
     try {
@@ -213,6 +234,11 @@ export const useAppStore = create<AppState>((set, get) => ({
     } catch (e) {
       set({ compare: null, compareGraph: null, compareNote: (e as Error).message })
     }
+  },
+
+  setTimelineMode: (timelineMode) => {
+    try { localStorage.setItem('timelineMode', timelineMode) } catch { /* ignore */ }
+    set({ timelineMode })
   },
 
   summarizeCompare: async () => {

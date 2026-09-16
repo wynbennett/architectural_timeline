@@ -163,3 +163,11 @@ input:focus, textarea:focus, select:focus { outline: none; border-color: var(--a
 .ask-btn { position: absolute; top: 5px; right: 6px; width: 16px; height: 16px; border-radius: 50%; border: 1px solid var(--border); background: var(--bg-3); color: var(--muted); font-size: 10px; line-height: 1; cursor: pointer; opacity: 0; transition: opacity 0.15s; padding: 0; }
 .gnode:hover .ask-btn { opacity: 1; }
 .ask-btn:hover { color: var(--accent); border-color: var(--accent); }
+
+/* timeline scope */
+.timeline-label { gap: 12px; }
+.timeline-scope { display: flex; align-items: center; gap: 4px; flex: 1; font-size: 11px; }
+.scope-btn { background: none; border: 1px solid var(--border); color: var(--muted); border-radius: 10px; padding: 1px 8px; cursor: pointer; font-size: 11px; }
+.scope-btn:hover { color: var(--text); }
+.scope-btn.active { border-color: var(--accent); color: var(--accent); }
+.tag-jump { margin-left: 8px; padding: 1px 6px; font-size: 11px; max-width: 160px; }
