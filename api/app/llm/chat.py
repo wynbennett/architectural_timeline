@@ -62,6 +62,8 @@ class ChatContext:
     def from_tag(cls, tag: Tag, *, tier: int, system_id: str | None, module_id: str | None, selected_node: str | None, open_file: str | None) -> "ChatContext":
         g = tag.graph
         arch: dict = {"system_level": g.tier1}
+        if g.overview:
+            arch["written_overview"] = g.overview
         if system_id and system_id in g.tier2:
             arch["modules_of_selected_system"] = {system_id: g.tier2[system_id]}
         if system_id and module_id:

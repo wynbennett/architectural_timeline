@@ -16,6 +16,7 @@ export interface GraphResponse {
   tier2: Record<string, Tier2Graph>
   tier3: Record<string, Tier3Graph>
   change_summary: string | null
+  overview: string | null
   model: string
   prompt_version: string
   generated_at: string | null

@@ -1,0 +1,35 @@
+Repository {owner}/{name} at tag {tag}.
+
+Write an architecture overview for a developer who is new to this codebase at this tag.
+Use the generated architecture map below as your source of truth for component names,
+and the README for intent. When you point at code, cite the bare file path in backticks
+(for example `src/auth/login.py`), using paths from the module `paths` lists; the tool
+turns those into links. You are not shown line numbers, so never invent line ranges.
+
+<readme>
+{readme}
+</readme>
+
+<architecture_map>
+{architecture}
+</architecture_map>
+
+Write in Markdown, roughly 400 to 700 words, with these sections:
+
+## What it is
+One short paragraph: purpose and the shape of the system.
+
+## Components
+One bullet per system-level component, in order of importance: what it does, its main
+modules, and what it talks to. Bold the component name.
+
+## How a request flows
+A short narrative of the main path through the system (or the main pipeline / entry
+point if it is a library or tool).
+
+## Design notes
+Three to six bullets on patterns, decisions, and trade-offs that are evident in the code:
+layering, persistence, error handling, extension points, testing approach.
+
+## Where to start reading
+Three to five files, each with a one-line reason, cited as a bare `path`.

@@ -58,3 +58,7 @@ class Tier3Graph(BaseModel):
 
 class ChangeSummary(BaseModel):
     summary: str
+
+
+class Overview(BaseModel):
+    markdown: str = Field(description="the overview in Markdown")

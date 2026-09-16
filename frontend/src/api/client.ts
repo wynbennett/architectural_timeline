@@ -32,6 +32,8 @@ export const api = {
   },
   summarizeCompare: (repoId: number, from: string, to: string) =>
     fetch(`/api/repos/${repoId}/compare/summary`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ from, to }) }).then(json<{ from: string; to: string; summary: string; cached: boolean }>),
+  writeOverview: (repoId: number, tag: string, force = false) =>
+    fetch(`/api/repos/${repoId}/tags/${encodeURIComponent(tag)}/overview`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ force }) }).then(json<{ overview: string; cached: boolean }>),
   listFiles: (repoId: number, tag: string) => fetch(`/api/repos/${repoId}/tags/${encodeURIComponent(tag)}/files`).then(json<FileEntry[]>),
   getFile: (repoId: number, tag: string, path: string) =>
     fetch(`/api/repos/${repoId}/tags/${encodeURIComponent(tag)}/files?path=${encodeURIComponent(path)}`).then(json<FileContent>),

@@ -1,20 +1,6 @@
-import { useEffect, useRef, useState, type ComponentProps } from 'react'
-import ReactMarkdown from 'react-markdown'
+import { useEffect, useRef, useState } from 'react'
 import { useAppStore } from '../../store/useAppStore'
-
-const CITE_RE = /^([\w@./+-]+\.[\w]+):(\d+)(?:-(\d+))?$/
-
-function Code({ children, className, ...rest }: ComponentProps<'code'>) {
-  const openPath = useAppStore((s) => s.openPath)
-  const text = String(children ?? '')
-  const m = !className && CITE_RE.exec(text.trim())
-  if (m) {
-    const start = Number(m[2])
-    const end = m[3] ? Number(m[3]) : start
-    return <button className="cite" onClick={() => openPath(m[1], start, end)} title="open in code pane">{text}</button>
-  }
-  return <code className={className} {...rest}>{children}</code>
-}
+import { Markdown } from '../shared/Markdown'
 
 export function ChatPane() {
   const { chat, chatBusy, sendChat, clearChat, currentTag, graph, tier, systemId, moduleId, openFile, chatDraft, setChatDraft, compareMode, compareTag } = useAppStore()
@@ -42,7 +28,7 @@ export function ChatPane() {
         {chat.map((m, i) => (
           <div key={i} className={`msg msg-${m.role}`}>
             {m.activity && m.activity.length > 0 && <div className="msg-activity">{m.activity.map((a, j) => <span key={j} className="mono">{a}</span>)}</div>}
-            {m.role === 'assistant' ? <ReactMarkdown components={{ code: Code }}>{m.content || (m.streaming ? '…' : '')}</ReactMarkdown> : <p>{m.content}</p>}
+            {m.role === 'assistant' ? <Markdown>{m.content || (m.streaming ? '…' : '')}</Markdown> : <p>{m.content}</p>}
           </div>
         ))}
       </div>

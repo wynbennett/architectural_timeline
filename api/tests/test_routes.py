@@ -101,3 +101,20 @@ def test_step_route_only_in_chunked_mode(client, seeded_repo):
             assert body["done"] is False and m.called
     finally:
         Config.GENERATION_MODE = monkeypatch_mode
+
+
+def test_overview_route(client, seeded_repo, fixture_repo, monkeypatch):
+    from app.routes import graphs as graphs_route
+    from app.schemas import Overview
+
+    monkeypatch.setattr(git, "repo_dir", lambda owner, name: fixture_repo)
+    with session_scope() as s:
+        repo_id = s.scalar(select(Repo).where(Repo.url == "https://github.com/acme/demo")).id
+    assert client.post(f"/api/repos/{repo_id}/tags/nope/overview").status_code == 404
+    with patch.object(graphs_route, "structured_call", return_value=Overview(markdown="## What it is\\nA demo.")) as m:
+        r = client.post(f"/api/repos/{repo_id}/tags/v0.2.0/overview")
+        assert r.status_code == 200 and r.get_json()["cached"] is False
+        assert "demo" in m.call_args.args[1]  # README text reached the prompt
+        r = client.post(f"/api/repos/{repo_id}/tags/v0.2.0/overview")
+        assert r.get_json()["cached"] is True and m.call_count == 1
+    assert client.get(f"/api/repos/{repo_id}/tags/v0.2.0/graph").get_json()["overview"].startswith("## What it is")

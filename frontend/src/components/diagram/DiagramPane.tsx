@@ -6,6 +6,7 @@ import { nodeTypes } from './nodes/GraphNodes'
 import { useElkLayout } from './useElkLayout'
 import { Breadcrumb } from './Breadcrumb'
 import { GenerateEmptyState } from '../timeline/GenerateEmptyState'
+import { OverviewPane } from './OverviewPane'
 
 function toEdges(edges: GraphEdge[], prefix: string, diff?: DiffScope): Edge[] {
   return edges.map((e, i) => {
@@ -110,19 +111,27 @@ function Canvas() {
 }
 
 export function DiagramPane() {
-  const { graph, graphLoading, currentTag } = useAppStore()
+  const { graph, graphLoading, currentTag, leftTab, setLeftTab } = useAppStore()
   return (
     <div className="pane diagram-pane">
       <div className="pane-header">
-        <Breadcrumb />
-        {graph?.tier1.summary && <span className="pane-header-hint" title={graph.tier1.summary}>ⓘ summary</span>}
+        <div className="tabs">
+          <button className={`tab${leftTab === 'diagram' ? ' active' : ''}`} onClick={() => setLeftTab('diagram')}>Diagram</button>
+          <button className={`tab${leftTab === 'overview' ? ' active' : ''}`} onClick={() => setLeftTab('overview')} disabled={!graph}>
+            Overview{graph?.overview ? '' : graph ? ' ○' : ''}
+          </button>
+        </div>
+        {leftTab === 'diagram' && <Breadcrumb />}
+        {leftTab === 'diagram' && graph?.tier1.summary && <span className="pane-header-hint" title={graph.tier1.summary}>ⓘ summary</span>}
       </div>
       {graphLoading ? (
         <div className="pane-empty">Loading {currentTag}…</div>
-      ) : graph ? (
-        <ReactFlowProvider><Canvas /></ReactFlowProvider>
-      ) : (
+      ) : !graph ? (
         <GenerateEmptyState />
+      ) : leftTab === 'overview' ? (
+        <OverviewPane />
+      ) : (
+        <ReactFlowProvider><Canvas /></ReactFlowProvider>
       )}
     </div>
   )

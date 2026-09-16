@@ -46,10 +46,11 @@ def init_db(target_engine=None) -> None:
     # demo-grade forward migration: add columns introduced after a table already existed
     from sqlalchemy import inspect, text
 
-    cols = {c["name"] for c in inspect(eng).get_columns("generation_jobs")}
-    if "state" not in cols:
-        with eng.begin() as conn:
-            conn.execute(text("ALTER TABLE generation_jobs ADD COLUMN state JSON"))
+    insp = inspect(eng)
+    for table, column, ddl_type in (("generation_jobs", "state", "JSON"), ("graphs", "overview", "TEXT")):
+        if column not in {c["name"] for c in insp.get_columns(table)}:
+            with eng.begin() as conn:
+                conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {ddl_type}"))
 
 
 @contextmanager

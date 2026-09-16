@@ -70,6 +70,7 @@ class Graph(Base):
     tier2: Mapped[dict] = mapped_column(JSON)
     tier3: Mapped[dict] = mapped_column(JSON)
     change_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    overview: Mapped[str | None] = mapped_column(Text, nullable=True)  # written overview, generated on demand
     model: Mapped[str] = mapped_column(String(64))
     prompt_version: Mapped[str] = mapped_column(String(32))
     generated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

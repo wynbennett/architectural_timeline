@@ -31,6 +31,8 @@ interface AppState {
   compareNote: string | null
   summarizing: boolean
   timelineMode: TimelineMode
+  leftTab: 'diagram' | 'overview'
+  overviewBusy: boolean
 
   init: () => Promise<void>
   loadRepo: (url: string, tagPattern?: string) => Promise<void>
@@ -53,6 +55,8 @@ interface AppState {
   refreshCompare: () => Promise<void>
   summarizeCompare: () => Promise<void>
   setTimelineMode: (m: TimelineMode) => void
+  setLeftTab: (t: 'diagram' | 'overview') => void
+  writeOverview: (force?: boolean) => Promise<void>
 }
 
 export type TimelineMode = 'generated' | 'recent' | 'all'
@@ -113,6 +117,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   compareNote: null,
   summarizing: false,
   timelineMode: loadTimelineMode(),
+  leftTab: 'diagram',
+  overviewBusy: false,
 
   init: async () => {
     try {
@@ -239,6 +245,22 @@ export const useAppStore = create<AppState>((set, get) => ({
       set({ compare, compareGraph, compareNote: compare ? null : `no graph for ${compareTag} yet` })
     } catch (e) {
       set({ compare: null, compareGraph: null, compareNote: (e as Error).message })
+    }
+  },
+
+  setLeftTab: (leftTab) => set({ leftTab }),
+
+  writeOverview: async (force = false) => {
+    const { repo, currentTag, graph } = get()
+    if (!repo || !currentTag || !graph) return
+    set({ overviewBusy: true, error: null })
+    try {
+      const r = await api.writeOverview(repo.id, currentTag, force)
+      if (get().currentTag === currentTag) set((s) => ({ graph: s.graph ? { ...s.graph, overview: r.overview } : s.graph }))
+    } catch (e) {
+      set({ error: (e as Error).message })
+    } finally {
+      set({ overviewBusy: false })
     }
   },
 
