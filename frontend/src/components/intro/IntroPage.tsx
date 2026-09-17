@@ -13,17 +13,20 @@ export function IntroPage() {
     <div className="intro">
       <div className="intro-top"><ThemeToggle /></div>
       <header className="intro-hero">
-        <h1>ArchTimeline</h1>
+        <div className="intro-kicker">architectural timeline</div>
+        <h1 className="intro-title">Ziggi</h1>
         <p className="intro-lede">
           Turn a Git repository into a navigable architecture map. For each release tag, Claude reads the code and
           builds three levels of detail: the systems and how they talk to each other, the modules inside each system,
-          and the code that matters in each module.
+          and the code that matters in each module. Then leap between tags to see how it all changed.
         </p>
-        <ul className="intro-points">
-          <li><strong>Time machine.</strong> Slide between tags to watch the architecture evolve; compare any two to see what was added, removed, or rewired.</li>
-          <li><strong>Grounded chat.</strong> Ask questions about the system at any tag. Answers cite real files that open in the code pane.</li>
-          <li><strong>Written overview.</strong> A per-tag walkthrough: what it is, the components, how a request flows, and where to start reading.</li>
-        </ul>
+        <div className="feature-grid">
+          <div className="feature"><span className="feature-icon">◫</span><strong>Graphical map</strong><p>Systems, modules, and code snippets drawn as an interactive diagram. Click a node to drill in, hover a line to see how things connect.</p></div>
+          <div className="feature"><span className="feature-icon">⧗</span><strong>Time machine</strong><p>Slide between tags to watch the architecture evolve; compare any two to see what was added, removed, or rewired.</p></div>
+          <div className="feature"><span className="feature-icon">✎</span><strong>Written overview</strong><p>A per-tag walkthrough: what it is, the components, how a request flows, and where to start reading.</p></div>
+          <div className="feature"><span className="feature-icon">❯</span><strong>Grounded chat</strong><p>Ask about the system at any tag. Answers cite real files that open right in the code pane.</p></div>
+        </div>
+        <p className="intro-footnote">Named for Ziggy, the hybrid computer that steered every leap in <em>Quantum Leap</em>.</p>
       </header>
 
       <section className="intro-repos">

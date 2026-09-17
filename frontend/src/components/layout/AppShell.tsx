@@ -17,7 +17,7 @@ export function AppShell() {
   return (
     <div className="app">
       <header className="topbar">
-        <button className="brand brand-link" onClick={goToIntro} title="back to the repository list">‹ ArchTimeline</button>
+        <button className="brand brand-link" onClick={goToIntro} title="back to the repository list">‹ <span className="brand-name">Ziggi</span></button>
         <div className="repo-controls">
           {repos.length > 0 && (
             <select value={repo?.id ?? ''} onChange={(e) => e.target.value && selectRepo(Number(e.target.value))}>

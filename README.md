@@ -1,4 +1,6 @@
-# Architectural Timeline
+# Ziggi: an architectural timeline
+
+Named for Ziggy, the hybrid computer from *Quantum Leap*.
 
 Point it at a public GitHub repo. Claude builds a three-tier architecture map
 (system → module → code snippet) for the newest tags, and a slider lets you travel
