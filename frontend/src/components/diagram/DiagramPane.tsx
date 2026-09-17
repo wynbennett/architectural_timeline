@@ -12,12 +12,15 @@ import { OverviewPane } from './OverviewPane'
 function toEdges(edges: GraphEdge[], prefix: string, names: Map<string, string>, diff?: DiffScope, compare?: { from: string; to: string }): Edge[] {
   return edges.map((e, i) => {
     const status = diff?.edges[edgeKey(e)]
+    const base = e.label || e.kind
+    // what the label pill will say; ELK reserves room for exactly this text
+    const labelText = compare ? (status === 'added' ? `+ ${base}` : status === 'removed' ? `− ${base}` : '') : base
     return {
       id: `${prefix}-${i}-${e.source}-${e.target}`,
       source: e.source,
       target: e.target,
       type: 'status',
-      data: { kind: e.kind, label: e.label, status, sourceName: names.get(e.source) ?? e.source, targetName: names.get(e.target) ?? e.target, compare },
+      data: { kind: e.kind, label: e.label, labelText, status, sourceName: names.get(e.source) ?? e.source, targetName: names.get(e.target) ?? e.target, compare },
       markerEnd: { type: MarkerType.ArrowClosed, width: 18, height: 18 },
       className: `edge-${e.kind}${status && status !== 'unchanged' ? ` edge-${status}` : ''}${compare && status === 'unchanged' ? ' edge-dim' : ''}`,
     }
@@ -86,8 +89,11 @@ function Canvas() {
 
   useEffect(() => {
     if (laid.key === key && laid.nodes.length) {
-      const t = window.setTimeout(() => fitView({ padding: 0.2, duration: 350 }), 30)
-      return () => window.clearTimeout(t)
+      // wait until React Flow has measured the new nodes (two frames), then fit
+      let raf2 = 0
+      const raf1 = window.requestAnimationFrame(() => { raf2 = window.requestAnimationFrame(() => { void fitView({ padding: 0.15, duration: 300 }) }) })
+      const t = window.setTimeout(() => { void fitView({ padding: 0.15, duration: 200 }) }, 250)
+      return () => { window.cancelAnimationFrame(raf1); window.cancelAnimationFrame(raf2); window.clearTimeout(t) }
     }
   }, [laid, key, fitView])
 
@@ -102,7 +108,7 @@ function Canvas() {
         onNodeClick={(_, n) => { if ((n.data as { status?: string }).status !== 'removed') drillInto(n.id) }}
         onNodeMouseEnter={(_, n) => { if (n.type === 'snippet') { const d = n.data as { filePath: string; startLine: number; endLine: number }; setHoverRange({ path: d.filePath, startLine: d.startLine, endLine: d.endLine }) } }}
         onNodeMouseLeave={() => setHoverRange(null)}
-        nodesDraggable
+        nodesDraggable={false}
         nodesConnectable={false}
         elementsSelectable
         minZoom={0.2}

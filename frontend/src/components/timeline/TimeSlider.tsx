@@ -11,7 +11,7 @@ function statusGlyph(t: TagInfo): { glyph: string; cls: string } {
 }
 
 export function TimeSlider() {
-  const { repo, currentTag, selectTag, compareMode, compareTag, setCompareTag, timelineMode, setTimelineMode } = useAppStore()
+  const { repo, currentTag, selectTag, compareMode, compareTag, setCompareTag, timelineMode, setTimelineMode, toggleCompareMode, graph } = useAppStore()
   const allTags = repo?.tags ?? []
   // Only the tags in scope are slider stops, spaced evenly, so the thumb always lands on a tag.
   const tags = useMemo(() => visibleTags(allTags, timelineMode, [currentTag, compareTag]), [allTags, timelineMode, currentTag, compareTag])
@@ -69,6 +69,9 @@ export function TimeSlider() {
             <strong>{shown.name}</strong>
             {shown.tagged_at && <span className="muted"> · {new Date(shown.tagged_at).toLocaleDateString()}</span>}
             <span className="muted"> · {shown.has_graph ? 'generated' : shown.status === 'none' ? 'not generated' : shown.status}</span>
+            <button className={`btn tiny compare-toggle${compareMode ? ' active' : ''}`} disabled={!graph} onClick={toggleCompareMode} title="Compare the current tag with an earlier one">
+              {compareMode ? 'exit compare' : 'compare'}
+            </button>
           </span>
         )}
       </div>

@@ -32,7 +32,12 @@ export function CompareBanner() {
           {changed.map(({ id, st }) => <span key={id} className={`change-chip change-${st}`} title={`${st}: ${id}`}>{st === 'added' ? '+' : st === 'removed' ? '−' : '~'} {nameOf(id)}</span>)}
         </div>
       )}
-      {compare?.summary && <p className="compare-summary">{compare.summary}</p>}
+      {compare?.summary && (
+        <details className="compare-summary">
+          <summary>what changed (narrative)</summary>
+          <p>{compare.summary}</p>
+        </details>
+      )}
       <span className="legend"><i className="sw sw-added" />added <i className="sw sw-removed" />removed <i className="sw sw-changed" />changed</span>
     </div>
   )

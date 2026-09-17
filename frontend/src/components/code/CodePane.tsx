@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { Group, Panel, Separator } from 'react-resizable-panels'
 import { api } from '../../api/client'
 import { useAppStore } from '../../store/useAppStore'
 import { tier3Key, type FileContent } from '../../types/graph'
@@ -14,6 +15,8 @@ export function CodePane() {
   const { repo, currentTag, graph, files, tier, systemId, moduleId, selectedNodeId, openFile, hoverRange, showAllFiles, toggleAllFiles, openPath } = useAppStore()
   const [content, setContent] = useState<FileContent | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [showFiles, setShowFiles] = useState<boolean>(() => { try { return localStorage.getItem('showFiles') !== '0' } catch { return true } })
+  const toggleFiles = () => setShowFiles((v) => { try { localStorage.setItem('showFiles', v ? '0' : '1') } catch { /* ignore */ } return !v })
 
   const allPaths = useMemo(() => files.map((f) => f.path), [files])
 
@@ -54,31 +57,43 @@ export function CodePane() {
   return (
     <div className="pane code-pane">
       <div className="pane-header">
+        <button className="btn tiny files-toggle" onClick={toggleFiles} title={showFiles ? 'hide file browser' : 'show file browser'} aria-pressed={showFiles}>{showFiles ? '◧ files' : '▤ files'}</button>
         <span className="mono path-label" title={openFile?.path}>{openFile?.path ?? 'no file selected'}</span>
         {currentTag && <span className="tag-chip">@ {currentTag}</span>}
         {range && <span className="muted mono">L{range.startLine}-{range.endLine}</span>}
       </div>
       <div className="code-body">
-        <div className="code-sidebar">
-          <div className="code-sidebar-head">
-            <span className="muted">{showAllFiles ? 'all files' : scopeLabel} · {treePaths.length}</span>
-            {scopePaths.length !== allPaths.length && (
-              <button className="btn tiny" onClick={toggleAllFiles}>{showAllFiles ? 'scope' : 'all'}</button>
-            )}
-          </div>
-          {treePaths.length ? <FileTree paths={treePaths} selected={openFile?.path ?? null} onOpen={(p) => openPath(p)} /> : <div className="pane-empty small">no files</div>}
-        </div>
-        <div className="code-editor">
-          {!openFile ? (
-            <div className="pane-empty">Click a snippet or a file to view code.</div>
-          ) : loadError ? (
-            <div className="pane-empty error-text">{loadError}</div>
-          ) : content ? (
-            <CodeViewer path={content.path} content={content.content} language={content.language} range={range} hover={hover} />
-          ) : (
-            <div className="pane-empty">loading…</div>
+        <Group orientation="horizontal">
+          {showFiles && (
+            <>
+              <Panel defaultSize={32} minSize={15} maxSize={60}>
+                <div className="code-sidebar">
+                  <div className="code-sidebar-head">
+                    <span className="muted">{showAllFiles ? 'all files' : scopeLabel} · {treePaths.length}</span>
+                    {scopePaths.length !== allPaths.length && (
+                      <button className="btn tiny" onClick={toggleAllFiles}>{showAllFiles ? 'scope' : 'all'}</button>
+                    )}
+                  </div>
+                  {treePaths.length ? <FileTree paths={treePaths} selected={openFile?.path ?? null} onOpen={(p) => openPath(p)} /> : <div className="pane-empty small">no files</div>}
+                </div>
+              </Panel>
+              <Separator className="sep sep-v" />
+            </>
           )}
-        </div>
+          <Panel minSize={30}>
+            <div className="code-editor">
+              {!openFile ? (
+                <div className="pane-empty">Click a snippet or a file to view code.</div>
+              ) : loadError ? (
+                <div className="pane-empty error-text">{loadError}</div>
+              ) : content ? (
+                <CodeViewer path={content.path} content={content.content} language={content.language} range={range} hover={hover} />
+              ) : (
+                <div className="pane-empty">loading…</div>
+              )}
+            </div>
+          </Panel>
+        </Group>
       </div>
     </div>
   )

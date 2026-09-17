@@ -10,7 +10,7 @@ import { CompareBanner } from '../timeline/CompareBanner'
 import { ThemeToggle } from './ThemeToggle'
 
 export function AppShell() {
-  const { health, repos, repo, selectRepo, error, toast, dismissToast, job, compareMode, toggleCompareMode, graph, goToIntro } = useAppStore()
+  const { health, repos, repo, selectRepo, error, toast, dismissToast, job, goToIntro } = useAppStore()
 
   useEffect(() => { if (toast) { const t = window.setTimeout(dismissToast, 4000); return () => window.clearTimeout(t) } }, [toast, dismissToast])
 
@@ -27,9 +27,6 @@ export function AppShell() {
           )}
           {health?.demo_mode && <span className="demo-chip" title="Loading new repositories and generating tags is disabled on this public demo">demo mode</span>}
         </div>
-        <button className={`btn tiny${compareMode ? ' active' : ''}`} disabled={!graph} onClick={toggleCompareMode} title="Compare the current tag with an earlier one">
-          {compareMode ? 'exit compare' : 'compare'}
-        </button>
         <ThemeToggle />
         <div className="topbar-right muted" title={health ? `credentials: ${health.auth}` : undefined}>
           {health ? `${health.model} · ${health.db} · ` : 'connecting…'}
@@ -44,16 +41,16 @@ export function AppShell() {
       {error && <div className="banner error">{error}<button className="btn tiny" onClick={() => useAppStore.setState({ error: null })}>dismiss</button></div>}
       {toast && <div className="banner toast">{toast}</div>}
       <main className="workspace">
-        <Group orientation="vertical">
-          <Panel defaultSize={68} minSize={30}>
-            <Group orientation="horizontal">
-              <Panel defaultSize={55} minSize={25}><DiagramPane /></Panel>
-              <Separator className="sep sep-v" />
-              <Panel defaultSize={45} minSize={20}><CodePane /></Panel>
+        <Group orientation="horizontal">
+          <Panel defaultSize={58} minSize={30}><DiagramPane /></Panel>
+          <Separator className="sep sep-v" />
+          <Panel defaultSize={42} minSize={22}>
+            <Group orientation="vertical">
+              <Panel defaultSize={62} minSize={25}><CodePane /></Panel>
+              <Separator className="sep sep-h" />
+              <Panel defaultSize={38} minSize={15}><ChatPane /></Panel>
             </Group>
           </Panel>
-          <Separator className="sep sep-h" />
-          <Panel defaultSize={32} minSize={15}><ChatPane /></Panel>
         </Group>
       </main>
     </div>
