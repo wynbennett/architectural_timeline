@@ -7,6 +7,7 @@ from ..config import Config
 from ..db import session_scope
 from ..llm.overview import write_overview
 from ..models import Tag
+from ..ratelimit import llm_rate_limited
 
 bp = Blueprint("graphs", __name__)
 
@@ -37,6 +38,7 @@ def get_graph(repo_id: int, tag_name: str):
 
 
 @bp.post("/repos/<int:repo_id>/tags/<path:tag_name>/overview")
+@llm_rate_limited
 def write_overview_route(repo_id: int, tag_name: str):
     """Generate (or regenerate with {"force": true}) the written overview for a tag. One model call, cached."""
     body = request.get_json(silent=True) or {}

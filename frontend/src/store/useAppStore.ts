@@ -33,8 +33,13 @@ interface AppState {
   timelineMode: TimelineMode
   leftTab: 'diagram' | 'overview'
   overviewBusy: boolean
+  screen: 'intro' | 'app'
+  theme: 'light' | 'dark'
 
   init: () => Promise<void>
+  openApp: () => void
+  goToIntro: () => void
+  setTheme: (t: 'light' | 'dark') => void
   loadRepo: (url: string) => Promise<void>
   selectRepo: (id: number) => Promise<void>
   selectTag: (name: string) => Promise<void>
@@ -70,6 +75,15 @@ export function visibleTags(tags: TagInfo[], mode: TimelineMode, keep: (string |
   if (mode === 'generated') return tags.filter(interesting)
   const recentFrom = Math.max(0, tags.length - RECENT_TAGS)
   return tags.filter((t, i) => i >= recentFrom || interesting(t))
+}
+
+function loadTheme(): 'light' | 'dark' {
+  try { const v = localStorage.getItem('theme'); if (v === 'dark' || v === 'light') return v } catch { /* ignore */ }
+  return 'light'
+}
+
+function applyTheme(theme: 'light' | 'dark') {
+  document.documentElement.dataset.theme = theme
 }
 
 function loadTimelineMode(): TimelineMode {
@@ -119,16 +133,25 @@ export const useAppStore = create<AppState>((set, get) => ({
   timelineMode: loadTimelineMode(),
   leftTab: 'diagram',
   overviewBusy: false,
+  screen: 'intro',
+  theme: loadTheme(),
 
   init: async () => {
+    applyTheme(get().theme)
     try {
       const [health, repos] = await Promise.all([api.health(), api.listRepos()])
       set({ health, repos })
-      const first = repos.find((r) => r.generated_count > 0) ?? repos[0]
-      if (first) await get().selectRepo(first.id)
     } catch (e) {
       set({ error: `backend unreachable: ${(e as Error).message}` })
     }
+  },
+
+  openApp: () => set({ screen: 'app', error: null }),
+  goToIntro: () => { pollRun++; set({ screen: 'intro', job: null }); void api.listRepos().then((repos) => set({ repos })).catch(() => undefined) },
+  setTheme: (theme) => {
+    try { localStorage.setItem('theme', theme) } catch { /* ignore */ }
+    applyTheme(theme)
+    set({ theme })
   },
 
   loadRepo: async (url) => {
@@ -317,17 +340,22 @@ export const useAppStore = create<AppState>((set, get) => ({
 let pollRun = 0
 
 /** Follow a job until it finishes. In local mode the server works in the background and we
- *  poll. In chunked mode (Vercel) nothing runs unless we ask: each POST /step performs one
- *  time-boxed slice, so the browser drives the job by calling step until it reports done. */
+ *  poll every couple of seconds. In chunked mode (Vercel) nothing runs unless we ask: each
+ *  POST /step performs one time-boxed slice, so the browser drives the job by calling step
+ *  until it reports done, with a short pause between calls. Errors back off exponentially. */
 function startPolling(jobId: number) {
   const run = ++pollRun
   const sleep = (ms: number) => new Promise((r) => window.setTimeout(r, ms))
+  const BASE_LOCAL = 2000, BASE_CHUNKED = 1500, MAX_DELAY = 30000
+  let delay = 0
   const loop = async () => {
     while (run === pollRun) {
       const s = useAppStore.getState()
       const chunked = s.health?.generation_mode === 'chunked'
+      const base = chunked ? BASE_CHUNKED : BASE_LOCAL
       try {
         const job = chunked ? await api.stepJob(jobId) : await api.getJob(jobId)
+        delay = base
         const repo = s.repo ? await api.getRepo(s.repo.id) : null
         if (run !== pollRun) return
         useAppStore.setState({ job, repo: repo ?? s.repo })
@@ -346,9 +374,9 @@ function startPolling(jobId: number) {
           return
         }
       } catch {
-        /* transient; keep going */
+        delay = Math.min(delay ? delay * 2 : base, MAX_DELAY)  // transient failure: back off
       }
-      if (!chunked) await sleep(2000)
+      await sleep(delay || base)
     }
   }
   void loop()

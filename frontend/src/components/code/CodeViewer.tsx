@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import Editor, { type OnMount } from '@monaco-editor/react'
 import type { editor as MonacoEditor } from 'monaco-editor'
+import { useAppStore } from '../../store/useAppStore'
 
 const MONACO_LANG: Record<string, string> = {
   python: 'python', typescript: 'typescript', javascript: 'javascript', go: 'go', rust: 'rust', java: 'java',
@@ -20,6 +21,7 @@ interface Props {
 }
 
 export function CodeViewer({ path, content, language, range, hover }: Props) {
+  const theme = useAppStore((s) => s.theme)
   const editorRef = useRef<MonacoEditor.IStandaloneCodeEditor | null>(null)
   const monacoRef = useRef<Parameters<OnMount>[1] | null>(null)
   const decosRef = useRef<MonacoEditor.IEditorDecorationsCollection | null>(null)
@@ -61,7 +63,7 @@ export function CodeViewer({ path, content, language, range, hover }: Props) {
       path={path}
       value={content}
       language={MONACO_LANG[language ?? ''] ?? 'plaintext'}
-      theme="vs-dark"
+      theme={theme === 'dark' ? 'vs-dark' : 'vs'}
       onMount={onMount}
       loading={<div className="pane-empty">loading editor…</div>}
       options={{ readOnly: true, domReadOnly: true, minimap: { enabled: true }, fontSize: 12.5, lineNumbers: 'on', scrollBeyondLastLine: false, wordWrap: 'off', renderLineHighlight: 'none', glyphMargin: false, folding: true, automaticLayout: true }}

@@ -9,7 +9,7 @@ from sqlalchemy import select
 
 from .db import init_db, session_scope
 from .ingest.git import parse_github_url
-from .llm import generate as gen
+from .llm import jobs as gen
 from .models import Graph, Repo, Tag
 
 

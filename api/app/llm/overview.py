@@ -12,7 +12,7 @@ from ..ingest.inventory import head_lines
 from ..models import Tag
 from ..schemas import Overview
 from .client import structured_call
-from .generate import load_prompt, render
+from .prompts import render_prompt, system_prompt
 
 log = logging.getLogger(__name__)
 
@@ -35,8 +35,8 @@ def write_overview(tag_id: int, force: bool = False) -> str:
     readme = ""
     if readme_path:
         readme = head_lines(get_file_source().read(owner, name, sha, readme_path, allowed={readme_path}) or "", 150)
-    prompt = render(load_prompt("overview"), owner=owner, name=name, tag=tag_name, readme=readme or "(no README)", architecture=json.dumps(arch, indent=1))
-    out = structured_call(load_prompt("system"), prompt, Overview, max_tokens=6000, effort="medium")
+    prompt = render_prompt("overview", owner=owner, name=name, tag=tag_name, readme=readme or "(no README)", architecture=json.dumps(arch, indent=1))
+    out = structured_call(system_prompt(), prompt, Overview, max_tokens=6000, effort="medium")
     with session_scope() as s:
         tag = s.get(Tag, tag_id)
         tag.graph.overview = out.markdown

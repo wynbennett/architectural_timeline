@@ -34,7 +34,9 @@ class GitHubRawFileSource:
 
     @lru_cache(maxsize=256)
     def _fetch(self, url: str) -> str | None:
-        resp = self.session.get(url, timeout=20)
+        from .github import auth_headers
+
+        resp = self.session.get(url, headers=auth_headers(), timeout=20)
         if resp.status_code != 200:
             return None
         return resp.text

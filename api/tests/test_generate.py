@@ -5,7 +5,7 @@ from sqlalchemy import select
 
 from app.db import init_db, session_scope
 from app.ingest import git
-from app.llm import generate as gen
+from app.llm import generate as gen, jobs
 from app.models import GenerationJob, Graph, Repo, Tag
 from app.schemas import Edge, ModuleNode, SnippetNode, SystemNode, Tier1Graph, Tier2Graph, Tier3Graph
 
@@ -35,18 +35,18 @@ def test_generate_tag_end_to_end(seeded_repo):
 
 def test_tag_pattern_filters(monkeypatch, seeded_repo):
     ran = []
-    monkeypatch.setattr(gen, "run_job", lambda job_id: ran.append(job_id))
+    monkeypatch.setattr(jobs, "run_job", lambda job_id: ran.append(job_id))
     with session_scope() as s:
         repo = s.scalar(select(Repo).where(Repo.url == "https://github.com/acme/demo"))
         ids = {t.name: t.id for t in repo.tags}
-    assert gen.select_newest(repo.id, n=3, tag_pattern=r"^v0\.1\.") == [ids["v0.1.0"]]
-    assert gen.select_newest(repo.id, n=1) == [ids["v0.2.0"]]
+    assert jobs.select_newest(repo.id, n=3, tag_pattern=r"^v0\.1\.") == [ids["v0.1.0"]]
+    assert jobs.select_newest(repo.id, n=1) == [ids["v0.2.0"]]
     try:
-        gen.select_newest(repo.id, n=3, tag_pattern=r"^nomatch")
+        jobs.select_newest(repo.id, n=3, tag_pattern=r"^nomatch")
         assert False, "expected ValueError"
     except ValueError:
         pass
-    gen.generate_newest(repo.id, n=3, tag_pattern=r"^v0\.1\.")
+    jobs.generate_newest(repo.id, n=3, tag_pattern=r"^v0\.1\.")
     assert len(ran) == 1
     with session_scope() as s:
         job = s.get(GenerationJob, ran[0])
@@ -63,13 +63,13 @@ def test_step_machine_resumes(monkeypatch, seeded_repo, fixture_repo):
         repo = s.scalar(select(Repo).where(Repo.url == "https://github.com/acme/demo"))
         tag_id = next(t.id for t in repo.tags if t.name == "v0.2.0")
         repo_id = repo.id
-    job_id = gen.create_job(repo_id, [tag_id], force=True)
+    job_id = jobs.create_job(repo_id, [tag_id], force=True)
     phases = []
     with _patch.object(gen, "structured_call", side_effect=fake_structured_call):
         for _ in range(30):
             with session_scope() as s:
                 phases.append(s.get(GenerationJob, job_id).state.get("phase", "inventory"))
-            if gen.run_job_step(job_id, budget_s=0):
+            if jobs.run_job_step(job_id, budget_s=0):
                 break
     assert phases[:3] == ["inventory", "tier1", "tier2"] and "tier3" in phases and len(phases) >= 5
     with session_scope() as s:
@@ -100,10 +100,10 @@ def test_unchanged_components_are_reused(monkeypatch, seeded_repo, fixture_repo)
         calls.append(output_type.__name__)
         return fake_structured_call(system, user, output_type, **kw)
 
-    job_id = gen.create_job(repo_id, [tag_id], force=True)
+    job_id = jobs.create_job(repo_id, [tag_id], force=True)
     with _patch.object(gen, "structured_call", side_effect=counting), \
          _patch.object(overview_mod, "structured_call", return_value=Overview(markdown="# overview")) as ov:
-        gen.run_job(job_id)
+        jobs.run_job(job_id)
 
     assert calls.count("Tier1Graph") == 1
     assert calls.count("Tier2Graph") == 1   # worker only; api-service reused, db has no files

@@ -1,6 +1,7 @@
 """Thin wrappers over the git CLI. All reads are done against a local clone."""
 from __future__ import annotations
 
+import base64
 import os
 import re
 import subprocess
@@ -24,12 +25,20 @@ def parse_github_url(url: str) -> tuple[str, str]:
     return m.group(1), m.group(2)
 
 
-def _run(args: list[str], cwd: Path | None = None, text: bool = True, stdin: str | None = None, no_lazy_fetch: bool = False) -> str | bytes:
+def _auth_args() -> list[str]:
+    """Send GITHUB_TOKEN as a per-command header so it is never written into .git/config."""
+    if not Config.GITHUB_TOKEN:
+        return []
+    basic = base64.b64encode(f"x-access-token:{Config.GITHUB_TOKEN}".encode()).decode()
+    return ["-c", f"http.https://github.com/.extraheader=Authorization: Basic {basic}"]
+
+
+def _run(args: list[str], cwd: Path | None = None, text: bool = True, stdin: str | None = None, no_lazy_fetch: bool = False, auth: bool = False) -> str | bytes:
     env = None
     if no_lazy_fetch:
         # Never reach out to the remote for a missing object; report it as missing instead.
         env = {**os.environ, "GIT_NO_LAZY_FETCH": "1"}
-    proc = subprocess.run(["git", *args], cwd=cwd, capture_output=True, input=stdin.encode() if stdin is not None else None, env=env)
+    proc = subprocess.run(["git", *(_auth_args() if auth else []), *args], cwd=cwd, capture_output=True, input=stdin.encode() if stdin is not None else None, env=env)
     if proc.returncode != 0:
         raise GitError(f"git {' '.join(args)} failed: {proc.stderr.decode(errors='replace').strip()}")
     return proc.stdout.decode(errors="replace") if text else proc.stdout
@@ -50,11 +59,11 @@ def clone_or_fetch(url: str) -> Path:
     owner, name = parse_github_url(url)
     dest = repo_dir(owner, name)
     if (dest / ".git").exists():
-        _run(["fetch", "--tags", "--force", "--prune", _blob_filter(), "origin"], cwd=dest)
+        _run(["fetch", "--tags", "--force", "--prune", _blob_filter(), "origin"], cwd=dest, auth=True)
         return dest
     dest.parent.mkdir(parents=True, exist_ok=True)
     clean = f"https://github.com/{owner}/{name}.git"
-    _run(["clone", _blob_filter(), "--no-checkout", clean, str(dest)])
+    _run(["clone", _blob_filter(), "--no-checkout", clean, str(dest)], auth=True)
     return dest
 
 

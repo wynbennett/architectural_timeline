@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 from flask import Blueprint, abort, jsonify, request
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from ..config import Config
 from ..db import session_scope
 from ..ingest.git import GitError, parse_github_url
 from ..llm import runner
-from ..models import Repo, Tag
+from ..models import Graph, Repo, Tag, TagStatus
+from ..ratelimit import llm_rate_limited
 
 bp = Blueprint("repos", __name__)
 
@@ -32,18 +33,29 @@ def _repo_dict(r: Repo, with_tags: bool = True) -> dict:
 
 
 def _require_generation() -> None:
+    if Config.DEMO_MODE:
+        abort(403, description="demo mode: loading repositories and generating tags is disabled")
     if not Config.GENERATION_ENABLED:
         abort(403, description="generation is disabled on this deployment; run it locally and sync")
 
 
 @bp.get("/repos")
 def list_repos():
+    # one aggregate query instead of loading every tag row of every repo
+    stmt = (
+        select(Repo, func.count(Tag.id.distinct()), func.count(Graph.id.distinct()))
+        .outerjoin(Tag, Tag.repo_id == Repo.id)
+        .outerjoin(Graph, Graph.tag_id == Tag.id)
+        .group_by(Repo.id)
+        .order_by(Repo.created_at.desc())
+    )
     with session_scope() as s:
-        repos = s.scalars(select(Repo).order_by(Repo.created_at.desc())).all()
-        return jsonify([_repo_dict(r, with_tags=False) | {"tag_count": len(r.tags), "generated_count": sum(1 for t in r.tags if t.graph)} for r in repos])
+        rows = s.execute(stmt).all()
+        return jsonify([_repo_dict(r, with_tags=False) | {"tag_count": tags, "generated_count": generated} for r, tags, generated in rows])
 
 
 @bp.post("/repos")
+@llm_rate_limited
 def create_repo():
     _require_generation()
     body = request.get_json(silent=True) or {}
@@ -74,13 +86,14 @@ def get_repo(repo_id: int):
 
 
 @bp.post("/repos/<int:repo_id>/tags/<path:tag_name>/generate")
+@llm_rate_limited
 def generate_tag(repo_id: int, tag_name: str):
     _require_generation()
     with session_scope() as s:
         tag = s.scalar(select(Tag).where(Tag.repo_id == repo_id, Tag.name == tag_name))
         if tag is None:
             abort(404)
-        if tag.status in {"queued", "running"}:
+        if tag.status in {TagStatus.QUEUED, TagStatus.RUNNING}:
             return jsonify({"error": "already in progress"}), 409
         tag_id = tag.id
     job_id = runner.enqueue_tag(repo_id, tag_id)

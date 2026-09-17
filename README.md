@@ -67,6 +67,19 @@ cd api && .venv/bin/python -m app.cli generate https://github.com/vitejs/vite --
   narrative of the transition (one call, cached). *Ask what changed* sends the diff to chat.
 - **Chat**: grounded in the generated graph plus read-file tools over the repo at that tag.
   Citations like `path:12-40` open the code pane. The `?` on any node pre-fills a question.
+- **Intro page, light/dark**: the landing page explains the tool and lists generated repos;
+  the theme toggle persists per browser (light by default).
+
+## Public demo settings
+
+- `DEMO_MODE=1` disables loading new repositories and generating new tags (the UI shows
+  why). Chat, overviews and change summaries stay on.
+- Model-calling endpoints are rate limited per client IP with a leaky bucket: burst
+  `LLM_RATE_CAPACITY` (10), then one call per `LLM_RATE_LEAK_SECONDS` (20). Over the limit
+  returns 429 with `Retry-After`. `RATE_LIMIT_ENABLED=0` turns it off (the tests do).
+- `GITHUB_TOKEN` lets the generator clone, tarball, and read files from private repos, and
+  raises the GitHub API rate limit. It is sent as a per-command header, never written to
+  `.git/config`.
 
 ## Tests
 
@@ -134,6 +147,6 @@ The same state machine runs locally, where a background thread simply loops the 
 ## Layout
 
 - `api/app/ingest` — git clone/tags/tree, inventory filters, file source abstraction
-- `api/app/llm` — prompts, structured-output generation (tier 1/2/3), background runner, chat
+- `api/app/llm` — `prompts.py` (cached Jinja templates in `prompts/`), `generate.py` (the three tiers and repair), `jobs.py` (resumable job state machine), `runner.py`, `chat.py`, `overview.py`
 - `api/app/routes` — REST + SSE chat
 - `frontend/src` — Zustand store, React Flow + ELK diagram, Monaco code pane, rc-slider timeline, chat

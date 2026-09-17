@@ -4,10 +4,12 @@ from __future__ import annotations
 import logging
 import os
 from pathlib import Path
-from typing import TypeVar
+from typing import TYPE_CHECKING, TypeVar
 
-import anthropic
 from pydantic import BaseModel
+
+if TYPE_CHECKING:  # the SDK is imported lazily: it is the slowest import and not needed to serve graphs
+    import anthropic
 
 from ..config import Config
 
@@ -24,7 +26,7 @@ def fallback_kwargs() -> dict:
         return {"betas": [FALLBACK_BETA], "fallbacks": "default"}
     return {}
 
-_client: anthropic.Anthropic | None = None
+_client: "anthropic.Anthropic | None" = None
 
 
 def _config_dir() -> Path:
@@ -62,11 +64,13 @@ def auth_source() -> str:
     return "none"
 
 
-def get_client() -> anthropic.Anthropic:
+def get_client() -> "anthropic.Anthropic":
     """Zero-arg client: the SDK resolves ANTHROPIC_API_KEY, then ANTHROPIC_AUTH_TOKEN,
     then an `ant auth login` OAuth profile (ANTHROPIC_PROFILE or the active/default one)."""
     global _client
     if _client is None:
+        import anthropic
+
         _client = anthropic.Anthropic(max_retries=3)
     return _client
 

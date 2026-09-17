@@ -13,7 +13,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.orm import Session, sessionmaker
 
 from .db import init_db, make_engine
-from .models import ChangeSummary, File, Graph, Repo, Tag
+from .models import ChangeSummary, File, Graph, Repo, Tag, TagStatus
 
 log = logging.getLogger(__name__)
 
@@ -48,7 +48,7 @@ def _upsert_repo(dst: Session, src_repo: Repo) -> Repo:
 def _upsert_tag(dst: Session, repo: Repo, src_tag: Tag) -> Tag:
     tag = dst.scalar(select(Tag).where(Tag.repo_id == repo.id, Tag.name == src_tag.name))
     # in-flight states are meaningless on another database
-    status = src_tag.status if src_tag.status in {"done", "failed"} else "none"
+    status = src_tag.status if src_tag.status in {TagStatus.DONE, TagStatus.FAILED} else TagStatus.NONE
     if tag is None:
         tag = Tag(repo_id=repo.id, name=src_tag.name, commit_sha=src_tag.commit_sha, tagged_at=src_tag.tagged_at, order_index=src_tag.order_index, status=status, error=src_tag.error)
         dst.add(tag)

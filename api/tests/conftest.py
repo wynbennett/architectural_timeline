@@ -15,6 +15,7 @@ os.environ["REPO_CACHE_DIR"] = str(_ROOT / "repos")
 os.environ["GENERATION_ENABLED"] = "1"
 os.environ["FILE_SOURCE"] = "local"
 os.environ["ANTHROPIC_API_KEY"] = "test-key"
+os.environ["RATE_LIMIT_ENABLED"] = "0"
 
 # Only import the app after the environment above is in place.
 from app.schemas import Edge, ModuleNode, SnippetNode, SystemNode, Tier1Graph, Tier2Graph, Tier3Graph  # noqa: E402
@@ -90,7 +91,7 @@ def seeded_repo(fixture_repo) -> int:
     from sqlalchemy import delete, select
     from app.db import init_db, session_scope
     from app.ingest import git
-    from app.llm import generate as gen
+    from app.llm import generate as gen, jobs
     from app.models import ChangeSummary, GenerationJob, Repo
 
     init_db()
@@ -112,6 +113,6 @@ def seeded_repo(fixture_repo) -> int:
     with patch.object(git, "clone_or_fetch", lambda url: fixture_repo), patch.object(git, "repo_dir", lambda owner, name: fixture_repo), \
          patch.object(gen, "structured_call", side_effect=fake_structured_call), \
          patch.object(overview_mod, "structured_call", return_value=Overview(markdown="# seeded overview")):
-        gen.load_repo(repo_id)
-        gen.generate_newest(repo_id, n=2)
+        jobs.load_repo(repo_id)
+        jobs.generate_newest(repo_id, n=2)
     return repo_id

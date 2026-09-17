@@ -88,15 +88,15 @@ def test_chat_tool_read_file(fixture_repo, monkeypatch, seeded_repo):
 
 def test_step_route_only_in_chunked_mode(client, seeded_repo):
     from app.config import Config
-    from app.llm import generate as gen
+    from app.llm import generate as gen, jobs
     with session_scope() as s:
         repo = s.scalar(select(Repo).where(Repo.url == "https://github.com/acme/demo"))
-        job_id = gen.create_job(repo.id, [repo.tags[0].id])
+        job_id = jobs.create_job(repo.id, [repo.tags[0].id])
     assert client.post(f"/api/jobs/{job_id}/step").status_code == 409
     monkeypatch_mode = Config.GENERATION_MODE
     Config.GENERATION_MODE = "chunked"
     try:
-        with patch.object(gen, "run_job_step", return_value=False) as m:
+        with patch.object(jobs, "run_job_step", return_value=False) as m:
             body = client.post(f"/api/jobs/{job_id}/step").get_json()
             assert body["done"] is False and m.called
     finally:

@@ -1,22 +1,24 @@
 """GitHub REST access used in chunked mode, where there is no git binary."""
 from __future__ import annotations
 
-import os
 import re
 from dataclasses import dataclass
 from datetime import datetime
 
 import requests
 
+from ..config import Config
+
 API = "https://api.github.com"
 
 
+def auth_headers() -> dict[str, str]:
+    """Authorization header when GITHUB_TOKEN is set (private repos, higher rate limits)."""
+    return {"Authorization": f"Bearer {Config.GITHUB_TOKEN}"} if Config.GITHUB_TOKEN else {}
+
+
 def _headers() -> dict[str, str]:
-    h = {"Accept": "application/vnd.github+json", "User-Agent": "arch-timeline"}
-    tok = os.environ.get("GITHUB_TOKEN")
-    if tok:
-        h["Authorization"] = f"Bearer {tok}"
-    return h
+    return {"Accept": "application/vnd.github+json", "User-Agent": "arch-timeline", **auth_headers()}
 
 
 @dataclass

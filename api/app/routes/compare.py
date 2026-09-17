@@ -9,8 +9,9 @@ from ..config import Config
 from ..db import session_scope
 from ..llm.client import structured_call
 from ..llm.diff import diff_digest, diff_graphs
-from ..llm.generate import load_prompt, render
+from ..llm.prompts import render_prompt, system_prompt
 from ..models import ChangeSummary, Tag
+from ..ratelimit import llm_rate_limited
 from ..schemas import ChangeSummary as ChangeSummarySchema
 
 bp = Blueprint("compare", __name__)
@@ -45,6 +46,7 @@ def compare(repo_id: int):
 
 
 @bp.post("/repos/<int:repo_id>/compare/summary")
+@llm_rate_limited
 def summarize(repo_id: int):
     body = request.get_json(silent=True) or {}
     with session_scope() as s:
@@ -60,13 +62,13 @@ def summarize(repo_id: int):
 
     d = diff_graphs(gb, ga)
     slim = lambda g: {"tier1": g["tier1"], "tier2": g["tier2"]}  # noqa: E731  (tier 3 is too large and not needed)
-    prompt = render(
-        load_prompt("change_summary"),
+    prompt = render_prompt(
+        "change_summary",
         owner=owner, name=name, prev_tag=a_name, tag=b_name,
         previous_graph=json.dumps(slim(ga)), current_graph=json.dumps(slim(gb)),
         computed_diff=diff_digest(gb, ga, d),
     )
-    out = structured_call(load_prompt("system"), prompt, ChangeSummarySchema, max_tokens=4000, effort="medium")
+    out = structured_call(system_prompt(), prompt, ChangeSummarySchema, max_tokens=4000, effort="medium")
     with session_scope() as s:
         existing = s.scalar(select(ChangeSummary).where(ChangeSummary.from_tag_id == a_id, ChangeSummary.to_tag_id == b_id))
         if existing:

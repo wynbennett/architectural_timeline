@@ -7,8 +7,8 @@ from datetime import datetime, timezone
 
 from ..config import Config
 from ..db import session_scope
-from ..models import GenerationJob
-from . import generate as gen
+from ..models import GenerationJob, JobStatus
+from . import jobs as gen
 
 log = logging.getLogger(__name__)
 
@@ -20,7 +20,7 @@ def _finish(job_id: int, error: str | None = None) -> None:
         job = s.get(GenerationJob, job_id)
         if job is None:
             return
-        job.status = "failed" if error else "done"
+        job.status = JobStatus.FAILED if error else JobStatus.DONE
         job.error = error
         job.finished_at = datetime.now(timezone.utc)
         if not error:
@@ -51,7 +51,7 @@ def enqueue_repo_load(repo_id: int, n_tags: int, tag_pattern: str | None = None)
         ids = gen.select_newest(repo_id, n_tags, tag_pattern)
         return gen.create_job(repo_id, ids)
     with session_scope() as s:
-        job = GenerationJob(repo_id=repo_id, status="queued", step="queued", detail="waiting for worker", state={})
+        job = GenerationJob(repo_id=repo_id, status=JobStatus.QUEUED, step="queued", detail="waiting for worker", state={})
         s.add(job)
         s.flush()
         job_id = job.id

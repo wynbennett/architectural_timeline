@@ -10,7 +10,8 @@ from ..config import Config
 from ..ingest.filesource import get_file_source
 from ..models import Tag
 from .client import fallback_kwargs, get_client
-from .generate import load_prompt, render, tier3_key
+from .generate import tier3_key
+from .prompts import render_prompt
 
 log = logging.getLogger(__name__)
 
@@ -87,7 +88,7 @@ class ChatContext:
         )
 
     def system_prompt(self) -> str:
-        text = render(load_prompt("chat"), owner=self.owner, name=self.name, tag=self.tag, architecture=self.architecture, viewing=self.viewing)
+        text = render_prompt("chat", owner=self.owner, name=self.name, tag=self.tag, architecture=self.architecture, viewing=self.viewing)
         if self.comparison:
             text += "\n\n<comparison>\n" + self.comparison + "\n</comparison>"
         return text

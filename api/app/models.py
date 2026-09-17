@@ -1,11 +1,13 @@
 """ORM models. File contents are never stored; see ingest/filesource.py."""
 from __future__ import annotations
 
+import enum
 from datetime import datetime, timezone
 
 from sqlalchemy import (
     JSON,
     DateTime,
+    Enum,
     ForeignKey,
     Integer,
     String,
@@ -19,6 +21,26 @@ from .db import Base
 
 def utcnow() -> datetime:
     return datetime.now(timezone.utc)
+
+
+class TagStatus(enum.StrEnum):
+    NONE = "none"        # no graph, nothing scheduled
+    QUEUED = "queued"
+    RUNNING = "running"
+    DONE = "done"
+    FAILED = "failed"
+
+
+class JobStatus(enum.StrEnum):
+    QUEUED = "queued"
+    RUNNING = "running"
+    DONE = "done"
+    FAILED = "failed"
+
+
+def _enum_column(kind: type[enum.StrEnum], default: enum.StrEnum):
+    # stored as its string value (not the member name), portable across sqlite and Postgres
+    return mapped_column(Enum(kind, native_enum=False, length=16, values_callable=lambda e: [m.value for m in e]), default=default)
 
 
 class Repo(Base):
@@ -50,7 +72,7 @@ class Tag(Base):
     commit_sha: Mapped[str] = mapped_column(String(64))
     tagged_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     order_index: Mapped[int] = mapped_column(Integer)  # 0 = oldest
-    status: Mapped[str] = mapped_column(String(16), default="none")  # none|queued|running|done|failed
+    status: Mapped[TagStatus] = _enum_column(TagStatus, TagStatus.NONE)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     repo: Mapped[Repo] = relationship(back_populates="tags")
@@ -101,7 +123,7 @@ class GenerationJob(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     repo_id: Mapped[int] = mapped_column(ForeignKey("repos.id", ondelete="CASCADE"))
     tag_id: Mapped[int | None] = mapped_column(ForeignKey("tags.id", ondelete="CASCADE"), nullable=True)
-    status: Mapped[str] = mapped_column(String(16), default="queued")  # queued|running|done|failed
+    status: Mapped[JobStatus] = _enum_column(JobStatus, JobStatus.QUEUED)
     step: Mapped[str] = mapped_column(String(64), default="queued")
     progress: Mapped[float] = mapped_column(default=0.0)  # 0..1
     detail: Mapped[str | None] = mapped_column(Text, nullable=True)

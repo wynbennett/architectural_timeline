@@ -1,0 +1,54 @@
+import { useState } from 'react'
+import { useAppStore } from '../../store/useAppStore'
+import { ThemeToggle } from '../layout/ThemeToggle'
+
+export function IntroPage() {
+  const { health, repos, selectRepo, loadRepo, openApp, error } = useAppStore()
+  const [url, setUrl] = useState('')
+  const demo = !!health?.demo_mode
+  const canLoad = !!health?.generation_enabled && !demo
+  const loadTitle = demo ? 'Demo mode: loading new repositories is disabled' : !health?.generation_enabled ? 'Generation is disabled on this deployment' : undefined
+
+  return (
+    <div className="intro">
+      <div className="intro-top"><ThemeToggle /></div>
+      <header className="intro-hero">
+        <h1>ArchTimeline</h1>
+        <p className="intro-lede">
+          Turn a Git repository into a navigable architecture map. For each release tag, Claude reads the code and
+          builds three levels of detail: the systems and how they talk to each other, the modules inside each system,
+          and the code that matters in each module.
+        </p>
+        <ul className="intro-points">
+          <li><strong>Time machine.</strong> Slide between tags to watch the architecture evolve; compare any two to see what was added, removed, or rewired.</li>
+          <li><strong>Grounded chat.</strong> Ask questions about the system at any tag. Answers cite real files that open in the code pane.</li>
+          <li><strong>Written overview.</strong> A per-tag walkthrough: what it is, the components, how a request flows, and where to start reading.</li>
+        </ul>
+      </header>
+
+      <section className="intro-repos">
+        <h2>Pick a repository</h2>
+        {repos.length === 0 && <p className="muted">{health ? 'Nothing generated yet.' : 'Connecting…'}</p>}
+        <div className="repo-grid">
+          {repos.map((r) => (
+            <button key={r.id} className="repo-card" onClick={() => { void selectRepo(r.id); openApp() }} disabled={r.generated_count === 0} title={r.generated_count === 0 ? 'no generated tags yet' : `open ${r.owner}/${r.name}`}>
+              <span className="repo-card-name">{r.owner}/<strong>{r.name}</strong></span>
+              <span className="repo-card-meta">{r.generated_count} of {r.tag_count} tags generated</span>
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <section className="intro-load">
+        <h2>Or load a new one</h2>
+        <form className="repo-form" onSubmit={(e) => { e.preventDefault(); if (canLoad && url.trim()) { void loadRepo(url.trim()); openApp() } }} title={loadTitle}>
+          <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://github.com/owner/repo" disabled={!canLoad} title={loadTitle} />
+          <button className="btn primary" type="submit" disabled={!canLoad || !url.trim()} title={loadTitle}>Load</button>
+        </form>
+        {demo && <p className="hint">This is a public demo, so loading new repositories and generating new tags is turned off. Browsing, chat, overviews, and comparisons all work.</p>}
+        {!demo && health?.generation_enabled && <p className="hint">Clones the repo and generates the newest three tags with {health.model}. Takes a few minutes per tag.</p>}
+        {error && <p className="error-text">{error}</p>}
+      </section>
+    </div>
+  )
+}

@@ -3,22 +3,23 @@ import { Background, Controls, MarkerType, ReactFlow, ReactFlowProvider, useReac
 import { useAppStore } from '../../store/useAppStore'
 import { edgeKey, tier3Key, type DiffScope, type GraphEdge, type GraphResponse, type Tier } from '../../types/graph'
 import { nodeTypes } from './nodes/GraphNodes'
+import { edgeTypes } from './StatusEdge'
 import { useElkLayout } from './useElkLayout'
 import { Breadcrumb } from './Breadcrumb'
 import { GenerateEmptyState } from '../timeline/GenerateEmptyState'
 import { OverviewPane } from './OverviewPane'
 
-function toEdges(edges: GraphEdge[], prefix: string, diff?: DiffScope): Edge[] {
+function toEdges(edges: GraphEdge[], prefix: string, names: Map<string, string>, diff?: DiffScope, compare?: { from: string; to: string }): Edge[] {
   return edges.map((e, i) => {
     const status = diff?.edges[edgeKey(e)]
     return {
       id: `${prefix}-${i}-${e.source}-${e.target}`,
       source: e.source,
       target: e.target,
-      label: e.label || e.kind,
-      type: 'smoothstep',
+      type: 'status',
+      data: { kind: e.kind, label: e.label, status, sourceName: names.get(e.source) ?? e.source, targetName: names.get(e.target) ?? e.target, compare },
       markerEnd: { type: MarkerType.ArrowClosed, width: 18, height: 18 },
-      className: `edge-${e.kind}${status && status !== 'unchanged' ? ` edge-${status}` : ''}`,
+      className: `edge-${e.kind}${status && status !== 'unchanged' ? ` edge-${status}` : ''}${compare && status === 'unchanged' ? ' edge-dim' : ''}`,
     }
   })
 }
@@ -46,15 +47,16 @@ function diffScopeOf(diff: DiffScope | undefined, tier: Tier, systemId: string |
 }
 
 function Canvas() {
-  const { graph, tier, systemId, moduleId, selectedNodeId, drillInto, setHoverRange, currentTag, compareMode, compare, compareGraph } = useAppStore()
+  const { graph, tier, systemId, moduleId, selectedNodeId, drillInto, setHoverRange, currentTag, compareMode, compare, compareGraph, theme } = useAppStore()
   const { fitView } = useReactFlow()
 
   const { rawNodes, rawEdges, key } = useMemo(() => {
     if (!graph) return { rawNodes: [] as Node[], rawEdges: [] as Edge[], key: 'empty' }
     const scope = scopeOf(graph, tier, systemId, moduleId)
     const diff = compareMode && compare ? diffScopeOf(undefined, tier, systemId, moduleId, compare.diff) : undefined
+    const pair = compareMode && compare ? { from: compare.from, to: compare.to } : undefined
     const nodes: Node[] = scope.nodes.map((n) => ({ ...n, position: { x: 0, y: 0 }, data: { ...n.data, status: diff?.nodes[n.id] } }))
-    let edges = toEdges(scope.edges, `t${tier}`, diff)
+    const names = new Map(nodes.map((n) => [n.id, String((n.data as { label: string }).label)]))
     if (diff && compareGraph) {
       // ghosts: things that existed in the compare tag but not in the current one
       const prev = scopeOf(compareGraph, tier, systemId, moduleId)
@@ -63,14 +65,17 @@ function Canvas() {
         if (diff.nodes[n.id] === 'removed' && !have.has(n.id)) {
           nodes.push({ ...n, position: { x: 0, y: 0 }, data: { ...n.data, status: 'removed' }, selectable: false, draggable: false })
           have.add(n.id)
+          names.set(n.id, String((n.data as { label: string }).label))
         }
       }
       const removedEdges = prev.edges.filter((e) => diff.edges[edgeKey(e)] === 'removed' && have.has(e.source) && have.has(e.target))
-      edges = edges.concat(toEdges(removedEdges, 'rm', diff))
+      const edges = toEdges(scope.edges, `t${tier}`, names, diff, pair).concat(toEdges(removedEdges, 'rm', names, diff, pair))
+      const scopeKey = tier === 1 ? '1' : tier === 2 ? `2:${systemId}` : `3:${systemId}/${moduleId}`
+      return { rawNodes: nodes, rawEdges: edges, key: `${currentTag}:${scopeKey}:vs:${compare!.from}` }
     }
-    const cmp = compareMode && compare ? `:vs:${compare.from}` : ''
+    const edges = toEdges(scope.edges, `t${tier}`, names, diff, pair)
     const scopeKey = tier === 1 ? '1' : tier === 2 ? `2:${systemId}` : `3:${systemId}/${moduleId}`
-    return { rawNodes: nodes, rawEdges: edges, key: `${currentTag}:${scopeKey}${cmp}` }
+    return { rawNodes: nodes, rawEdges: edges, key: `${currentTag}:${scopeKey}` }
   }, [graph, tier, systemId, moduleId, currentTag, compareMode, compare, compareGraph])
 
   const laid = useElkLayout(rawNodes, rawEdges, key)
@@ -93,6 +98,7 @@ function Canvas() {
         nodes={nodes}
         edges={laid.edges}
         nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
         onNodeClick={(_, n) => { if ((n.data as { status?: string }).status !== 'removed') drillInto(n.id) }}
         onNodeMouseEnter={(_, n) => { if (n.type === 'snippet') { const d = n.data as { filePath: string; startLine: number; endLine: number }; setHoverRange({ path: d.filePath, startLine: d.startLine, endLine: d.endLine }) } }}
         onNodeMouseLeave={() => setHoverRange(null)}
@@ -100,7 +106,7 @@ function Canvas() {
         nodesConnectable={false}
         elementsSelectable
         minZoom={0.2}
-        colorMode="dark"
+        colorMode={theme}
       >
         <Background gap={24} />
         <Controls showInteractive={false} />
@@ -121,8 +127,6 @@ export function DiagramPane() {
             Overview{graph?.overview ? '' : graph ? ' ○' : ''}
           </button>
         </div>
-        {leftTab === 'diagram' && <Breadcrumb />}
-        {leftTab === 'diagram' && graph?.tier1.summary && <span className="pane-header-hint" title={graph.tier1.summary}>ⓘ summary</span>}
       </div>
       {graphLoading ? (
         <div className="pane-empty">Loading {currentTag}…</div>
@@ -131,7 +135,13 @@ export function DiagramPane() {
       ) : leftTab === 'overview' ? (
         <OverviewPane />
       ) : (
-        <ReactFlowProvider><Canvas /></ReactFlowProvider>
+        <div className="diagram-tab">
+          <div className="diagram-toolbar">
+            <Breadcrumb />
+            {graph.tier1.summary && <span className="pane-header-hint" title={graph.tier1.summary}>ⓘ summary</span>}
+          </div>
+          <ReactFlowProvider><Canvas /></ReactFlowProvider>
+        </div>
       )}
     </div>
   )

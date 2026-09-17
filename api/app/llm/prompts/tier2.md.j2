@@ -1,19 +1,19 @@
-Repository {owner}/{name} at tag {tag}.
+Repository {{ owner }}/{{ name }} at tag {{ tag }}.
 You are now zooming into ONE system component:
 
-  {system_name} (id: {system_id}, kind: {system_kind})
-  {system_description}
-  paths: {system_paths}
+  {{ system_name }} (id: {{ system_id }}, kind: {{ system_kind }})
+  {{ system_description }}
+  paths: {{ system_paths }}
 
 The other components in this system, for reference when a module talks outward:
-{sibling_components}
+{{ sibling_components }}
 
 <files>
-{files}
+{{ files }}
 </files>
 
-<previous_tag_modules tag="{prev_tag}">
-{previous_modules}
+<previous_tag_modules tag="{{ prev_tag }}">
+{{ previous_modules }}
 </previous_tag_modules>
 
 Break this component into modules: cohesive groups of files with a single responsibility

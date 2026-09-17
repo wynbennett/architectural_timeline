@@ -16,6 +16,11 @@ export function GenerateEmptyState() {
       <h3>No graph for {tag.name} yet</h3>
       {inProgress ? (
         <JobProgress />
+      ) : health?.demo_mode ? (
+        <>
+          <button className="btn primary" disabled title="Demo mode: generating new tags is disabled on this public demo">Generate {tag.name}</button>
+          <p className="hint">Demo mode: generating new tags is disabled. Pick a generated tag on the timeline instead.</p>
+        </>
       ) : health?.generation_enabled ? (
         <>
           {tag.status === 'failed' && <p className="error-text">Last attempt failed: {tag.error}</p>}

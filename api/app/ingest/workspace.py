@@ -92,8 +92,13 @@ def fetch_tarball(owner: str, name: str, sha: str, session: requests.Session | N
     marker = dest / ".complete"
     if marker.exists():
         return DirWorkspace(root=dest, sha=sha)
-    url = f"https://codeload.github.com/{owner}/{name}/tar.gz/{sha}"
-    resp = (session or requests).get(url, timeout=120)
+    if Config.GITHUB_TOKEN:
+        # the API endpoint honors the token (private repos); it redirects to a signed codeload URL
+        from .github import auth_headers
+
+        resp = (session or requests).get(f"https://api.github.com/repos/{owner}/{name}/tarball/{sha}", headers=auth_headers(), timeout=120)
+    else:
+        resp = (session or requests).get(f"https://codeload.github.com/{owner}/{name}/tar.gz/{sha}", timeout=120)
     resp.raise_for_status()
     dest.mkdir(parents=True, exist_ok=True)
     with tarfile.open(fileobj=io.BytesIO(resp.content), mode="r:gz") as tar:

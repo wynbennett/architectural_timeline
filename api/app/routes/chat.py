@@ -11,11 +11,13 @@ from ..db import session_scope
 from ..llm import chat as chat_llm
 from ..llm.diff import diff_digest, diff_graphs
 from ..models import ChangeSummary, Tag
+from ..ratelimit import llm_rate_limited
 
 bp = Blueprint("chat", __name__)
 
 
 @bp.post("/chat")
+@llm_rate_limited
 def chat():
     body = request.get_json(silent=True) or {}
     repo_id = body.get("repo_id")

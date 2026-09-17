@@ -27,7 +27,7 @@ export interface TagInfo { name: string; sha: string; tagged_at: string | null; 
 export interface RepoDetail { id: number; url: string; owner: string; name: string; default_branch: string | null; tags: TagInfo[] }
 export interface RepoSummary { id: number; url: string; owner: string; name: string; tag_count: number; generated_count: number }
 export interface Job { id: number; repo_id: number; tag: string | null; status: 'queued' | 'running' | 'done' | 'failed'; step: string; progress: number; detail: string | null; error: string | null }
-export interface Health { ok: boolean; generation_enabled: boolean; generation_mode: 'local' | 'chunked' | 'off'; db: string; file_source: string; model: string; auth: string }
+export interface Health { ok: boolean; generation_enabled: boolean; generation_mode: 'local' | 'chunked' | 'off'; demo_mode: boolean; db: string; file_source: string; model: string; auth: string }
 export interface FileEntry { path: string; language: string | null; size: number }
 export interface FileContent { path: string; language: string | null; content: string; sha: string }
 

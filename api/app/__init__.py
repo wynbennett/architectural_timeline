@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from flask import Flask, jsonify
 from flask_cors import CORS
+from werkzeug.exceptions import HTTPException
 
 from .config import Config
 from .db import init_db
@@ -31,6 +32,7 @@ def create_app() -> Flask:
                 "ok": True,
                 "generation_enabled": Config.GENERATION_ENABLED,
                 "generation_mode": Config.GENERATION_MODE,
+                "demo_mode": Config.DEMO_MODE,
                 "db": "sqlite" if Config.is_sqlite() else "postgres",
                 "file_source": Config.FILE_SOURCE,
                 "model": Config.MODEL,
@@ -38,8 +40,9 @@ def create_app() -> Flask:
             }
         )
 
-    @app.errorhandler(404)
-    def not_found(_e):
-        return jsonify({"error": "not found"}), 404
+    @app.errorhandler(HTTPException)
+    def http_error(e: HTTPException):
+        # every abort() becomes JSON the frontend can show
+        return jsonify({"error": e.description if e.code != 404 else "not found", "status": e.code}), e.code
 
     return app
