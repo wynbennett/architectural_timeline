@@ -18,6 +18,7 @@ import requests
 
 from ..config import Config
 from . import git
+from .github import auth_headers
 
 
 class Workspace(Protocol):
@@ -92,13 +93,14 @@ def fetch_tarball(owner: str, name: str, sha: str, session: requests.Session | N
     marker = dest / ".complete"
     if marker.exists():
         return DirWorkspace(root=dest, sha=sha)
+    http = session or requests
+    resp = None
     if Config.GITHUB_TOKEN:
         # the API endpoint honors the token (private repos); it redirects to a signed codeload URL
-        from .github import auth_headers
-
-        resp = (session or requests).get(f"https://api.github.com/repos/{owner}/{name}/tarball/{sha}", headers=auth_headers(), timeout=120)
-    else:
-        resp = (session or requests).get(f"https://codeload.github.com/{owner}/{name}/tar.gz/{sha}", timeout=120)
+        resp = http.get(f"https://api.github.com/repos/{owner}/{name}/tarball/{sha}", headers={"User-Agent": "arch-timeline", **auth_headers()}, timeout=120)
+    if resp is None or not resp.ok:
+        # anonymous path for public repos (also the fallback when the token is revoked or mis-scoped)
+        resp = http.get(f"https://codeload.github.com/{owner}/{name}/tar.gz/{sha}", timeout=120)
     resp.raise_for_status()
     dest.mkdir(parents=True, exist_ok=True)
     with tarfile.open(fileobj=io.BytesIO(resp.content), mode="r:gz") as tar:

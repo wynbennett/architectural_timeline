@@ -74,9 +74,11 @@ cd api && .venv/bin/python -m app.cli generate https://github.com/vitejs/vite --
 
 - `DEMO_MODE=1` disables loading new repositories and generating new tags (the UI shows
   why). Chat, overviews and change summaries stay on.
-- Model-calling endpoints are rate limited per client IP with a leaky bucket: burst
-  `LLM_RATE_CAPACITY` (10), then one call per `LLM_RATE_LEAK_SECONDS` (20). Over the limit
-  returns 429 with `Retry-After`. `RATE_LIMIT_ENABLED=0` turns it off (the tests do).
+- Model calls are rate limited per client with a leaky bucket: burst `LLM_RATE_CAPACITY`
+  (10), then one call per `LLM_RATE_LEAK_SECONDS` (20). Only real model calls count
+  (cached overviews and summaries are free); over the limit returns 429 with `Retry-After`.
+  The client key is the remote address after `ProxyFix` for `TRUSTED_PROXY_HOPS` hops
+  (1 on Vercel), so `X-Forwarded-For` cannot be spoofed. `RATE_LIMIT_ENABLED=0` turns it off.
 - `GITHUB_TOKEN` lets the generator clone, tarball, and read files from private repos, and
   raises the GitHub API rate limit. It is sent as a per-command header, never written to
   `.git/config`.

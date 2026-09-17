@@ -5,6 +5,7 @@ from flask import Blueprint, abort, jsonify
 from ..config import Config
 from ..db import session_scope
 from ..llm import jobs as gen
+from ..ratelimit import rate_limit_response
 from ..models import GenerationJob, Tag
 
 bp = Blueprint("jobs", __name__)
@@ -39,12 +40,14 @@ def get_job(job_id: int):
 def step_job(job_id: int):
     """Chunked mode: run one time-boxed slice of the job. The client calls this until done."""
     if Config.DEMO_MODE:
-        return jsonify({"error": "demo mode: generation is disabled"}), 403
+        abort(403, description="demo mode: loading repositories and generating tags is disabled")
     if Config.GENERATION_MODE != "chunked":
         return jsonify({"error": "step is only used in chunked generation mode"}), 409
     with session_scope() as s:
         if s.get(GenerationJob, job_id) is None:
             abort(404)
+    if (limited := rate_limit_response()) is not None:
+        return limited
     err = None
     try:
         done = gen.run_job_step(job_id)

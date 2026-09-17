@@ -7,7 +7,7 @@ from pathlib import Path
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
 
 PROMPTS_DIR = Path(__file__).parent / "prompts"
-PROMPT_VERSION = "v3"  # bump when prompt text changes in a way that should be visible on graph rows
+PROMPT_VERSION = "v2"  # bump when prompt *text* changes; reuse across tags only happens within one version
 
 _env = Environment(
     loader=FileSystemLoader(str(PROMPTS_DIR)),

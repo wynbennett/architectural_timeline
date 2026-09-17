@@ -11,13 +11,12 @@ from ..db import session_scope
 from ..llm import chat as chat_llm
 from ..llm.diff import diff_digest, diff_graphs
 from ..models import ChangeSummary, Tag
-from ..ratelimit import llm_rate_limited
+from ..ratelimit import rate_limit_response
 
 bp = Blueprint("chat", __name__)
 
 
 @bp.post("/chat")
-@llm_rate_limited
 def chat():
     body = request.get_json(silent=True) or {}
     repo_id = body.get("repo_id")
@@ -25,6 +24,8 @@ def chat():
     messages = body.get("messages") or []
     if not repo_id or not tag_name or not messages:
         return jsonify({"error": "repo_id, tag and messages are required"}), 400
+    if (limited := rate_limit_response()) is not None:
+        return limited
 
     with session_scope() as s:
         tag = s.scalar(select(Tag).where(Tag.repo_id == repo_id, Tag.name == tag_name))

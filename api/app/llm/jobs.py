@@ -28,7 +28,9 @@ from ..ingest.inventory import build_inventory
 from ..ingest.workspace import open_workspace
 from ..models import File, GenerationJob, Graph, JobStatus, Repo, Tag, TagStatus
 from ..schemas import ModuleNode, SystemNode
-from .generate import PROMPT_VERSION, TagContext, run_tier1, run_tier2, run_tier3, tier3_key
+from .generate import TagContext, run_tier1, run_tier2, run_tier3, tier3_key
+from .overview import write_overview
+from .prompts import PROMPT_VERSION
 
 log = logging.getLogger(__name__)
 
@@ -96,14 +98,16 @@ def load_repo(repo_id: int, job_id: int | None = None) -> list[int]:
 def select_newest(repo_id: int, n: int | None = None, tag_pattern: str | None = None) -> list[int]:
     """Ids of the newest n tags (oldest first). `tag_pattern` is a regex restricting which
     tags count, e.g. r"^v\\d+\\.\\d+\\.\\d+$" to skip pre-releases and per-package tags."""
-    n = n or Config.TAGS_ON_LOAD
+    n = Config.TAGS_ON_LOAD if n is None else n
+    if n <= 0:
+        raise ValueError("n must be positive")
     rx = re.compile(tag_pattern) if tag_pattern else None
     with session_scope() as s:
         tags = s.scalars(select(Tag).where(Tag.repo_id == repo_id).order_by(Tag.order_index)).all()
         ids = [t.id for t in tags if rx is None or rx.search(t.name)]
     if not ids:
         raise ValueError(f"no tags match {tag_pattern!r}")
-    return ids[-n:] if n > 0 else []
+    return ids[-n:]
 
 
 def generate_newest(repo_id: int, n: int | None = None, force: bool = False, job_id: int | None = None, tag_pattern: str | None = None) -> None:
@@ -171,15 +175,16 @@ def _build_ctx(repo_id: int, tag_id: int, state: dict) -> TagContext:
     with session_scope() as s:
         tag = s.get(Tag, tag_id)
         owner, name, tag_name, sha = tag.repo.owner, tag.repo.name, tag.name, tag.commit_sha
-        prev_tag, prev_graph, prev_files = None, None, None
+        prev_tag, prev_graph, prev_files, prev_version = None, None, None, None
         if state.get("prev_tag_id"):
             p = s.get(Tag, state["prev_tag_id"])
             if p is not None and p.graph is not None:
                 prev_tag, prev_graph = p.name, {"tier1": p.graph.tier1, "tier2": p.graph.tier2, "tier3": p.graph.tier3}
                 prev_files = {f.path: f.blob_sha for f in p.files if f.blob_sha}
+                prev_version = p.graph.prompt_version
     ws = open_workspace(owner, name, sha)
     inv = build_inventory(ws)
-    return TagContext(ws=ws, owner=owner, name=name, tag=tag_name, sha=sha, inv=inv, prev_tag=prev_tag, prev_graph=prev_graph, prev_files=prev_files)
+    return TagContext(ws=ws, owner=owner, name=name, tag=tag_name, sha=sha, inv=inv, prev_tag=prev_tag, prev_graph=prev_graph, prev_files=prev_files, prev_prompt_version=prev_version)
 
 
 def run_job_step(job_id: int, budget_s: float | None = None) -> bool:
@@ -189,11 +194,8 @@ def run_job_step(job_id: int, budget_s: float | None = None) -> bool:
     ctx: TagContext | None = None
 
     def save(state: dict, **fields: object) -> None:
-        with session_scope() as s:
-            job = s.get(GenerationJob, job_id)
-            job.state = json.loads(json.dumps(state))  # fresh object so the JSON column is marked dirty
-            for k, v in fields.items():
-                setattr(job, k, v)
+        # a fresh object so the JSON column is marked dirty
+        _job_update(job_id, state=json.loads(json.dumps(state)), **fields)
 
     with session_scope() as s:
         job = s.get(GenerationJob, job_id)
@@ -310,8 +312,6 @@ def run_job_step(job_id: int, budget_s: float | None = None) -> bool:
                     save(state, progress=1.0, detail=f"{prefix}{tag_name}: done")
 
             elif phase == "overview":
-                from .overview import write_overview  # local import: overview imports this module
-
                 try:
                     write_overview(tag_id, force=force)
                 except Exception as e:  # the graph is already saved; a failed overview must not fail the tag

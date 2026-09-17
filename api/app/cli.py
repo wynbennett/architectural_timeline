@@ -26,7 +26,7 @@ def main(argv: list[str] | None = None) -> int:
 
     g = sub.add_parser("generate", help="clone a repo and generate graphs")
     g.add_argument("url")
-    g.add_argument("--tags", type=int, default=None, help="how many newest tags (default from config)")
+    g.add_argument("--tags", type=lambda v: max(1, int(v)), default=None, help="how many newest tags (default from config)")
     g.add_argument("--tag", default=None, help="generate a single tag by name")
     g.add_argument("--force", action="store_true", help="regenerate even if a graph exists")
     g.add_argument("--tag-pattern", default=None, help=r"regex; only matching tags are eligible (e.g. '^v\d+\.\d+\.\d+$')")

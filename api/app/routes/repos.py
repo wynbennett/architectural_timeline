@@ -8,7 +8,7 @@ from ..db import session_scope
 from ..ingest.git import GitError, parse_github_url
 from ..llm import runner
 from ..models import Graph, Repo, Tag, TagStatus
-from ..ratelimit import llm_rate_limited
+from ..ratelimit import rate_limit_response
 
 bp = Blueprint("repos", __name__)
 
@@ -55,7 +55,6 @@ def list_repos():
 
 
 @bp.post("/repos")
-@llm_rate_limited
 def create_repo():
     _require_generation()
     body = request.get_json(silent=True) or {}
@@ -64,6 +63,8 @@ def create_repo():
         owner, name = parse_github_url(url)
     except GitError as e:
         return jsonify({"error": str(e)}), 400
+    if (limited := rate_limit_response()) is not None:
+        return limited
     canonical = f"https://github.com/{owner}/{name}"
     with session_scope() as s:
         repo = s.scalar(select(Repo).where(Repo.url == canonical))
@@ -86,7 +87,6 @@ def get_repo(repo_id: int):
 
 
 @bp.post("/repos/<int:repo_id>/tags/<path:tag_name>/generate")
-@llm_rate_limited
 def generate_tag(repo_id: int, tag_name: str):
     _require_generation()
     with session_scope() as s:
@@ -96,5 +96,7 @@ def generate_tag(repo_id: int, tag_name: str):
         if tag.status in {TagStatus.QUEUED, TagStatus.RUNNING}:
             return jsonify({"error": "already in progress"}), 409
         tag_id = tag.id
+    if (limited := rate_limit_response()) is not None:
+        return limited
     job_id = runner.enqueue_tag(repo_id, tag_id)
     return jsonify({"job_id": job_id}), 202

@@ -11,7 +11,7 @@ from ..llm.client import structured_call
 from ..llm.diff import diff_digest, diff_graphs
 from ..llm.prompts import render_prompt, system_prompt
 from ..models import ChangeSummary, Tag
-from ..ratelimit import llm_rate_limited
+from ..ratelimit import rate_limit_response
 from ..schemas import ChangeSummary as ChangeSummarySchema
 
 bp = Blueprint("compare", __name__)
@@ -46,7 +46,6 @@ def compare(repo_id: int):
 
 
 @bp.post("/repos/<int:repo_id>/compare/summary")
-@llm_rate_limited
 def summarize(repo_id: int):
     body = request.get_json(silent=True) or {}
     with session_scope() as s:
@@ -59,6 +58,8 @@ def summarize(repo_id: int):
             return jsonify({"from": a.name, "to": b.name, "summary": cached.summary, "cached": True})
         ga, gb = _graph_dict(a), _graph_dict(b)
         owner, name, a_id, b_id, a_name, b_name = a.repo.owner, a.repo.name, a.id, b.id, a.name, b.name
+    if (limited := rate_limit_response()) is not None:
+        return limited
 
     d = diff_graphs(gb, ga)
     slim = lambda g: {"tier1": g["tier1"], "tier2": g["tier2"]}  # noqa: E731  (tier 3 is too large and not needed)

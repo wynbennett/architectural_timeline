@@ -7,7 +7,6 @@ from datetime import datetime, timezone
 from sqlalchemy import (
     JSON,
     DateTime,
-    Enum,
     ForeignKey,
     Integer,
     String,
@@ -15,6 +14,7 @@ from sqlalchemy import (
     UniqueConstraint,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.types import TypeDecorator
 
 from .db import Base
 
@@ -38,9 +38,31 @@ class JobStatus(enum.StrEnum):
     FAILED = "failed"
 
 
+class StrEnumType(TypeDecorator):
+    """Stores a StrEnum by value in a VARCHAR. Unknown stored values (hand edits, a sync from
+    another schema version) load as plain strings instead of raising."""
+
+    impl = String(16)
+    cache_ok = True
+
+    def __init__(self, kind: type[enum.StrEnum]) -> None:
+        super().__init__()
+        self.kind = kind
+
+    def process_bind_param(self, value, dialect):
+        return None if value is None else str(value)
+
+    def process_result_value(self, value, dialect):
+        if value is None:
+            return None
+        try:
+            return self.kind(value)
+        except ValueError:
+            return value
+
+
 def _enum_column(kind: type[enum.StrEnum], default: enum.StrEnum):
-    # stored as its string value (not the member name), portable across sqlite and Postgres
-    return mapped_column(Enum(kind, native_enum=False, length=16, values_callable=lambda e: [m.value for m in e]), default=default)
+    return mapped_column(StrEnumType(kind), default=default)
 
 
 class Repo(Base):

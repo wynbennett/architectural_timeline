@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import base64
+import logging
 import os
 import re
 import subprocess
@@ -10,6 +11,8 @@ from datetime import datetime
 from pathlib import Path
 
 from ..config import Config
+
+log = logging.getLogger(__name__)
 
 _GITHUB_RE = re.compile(r"^(?:https?://github\.com/|git@github\.com:)([^/]+)/([^/]+?)(?:\.git)?/?$")
 
@@ -25,20 +28,23 @@ def parse_github_url(url: str) -> tuple[str, str]:
     return m.group(1), m.group(2)
 
 
-def _auth_args() -> list[str]:
-    """Send GITHUB_TOKEN as a per-command header so it is never written into .git/config."""
+def _auth_env() -> dict[str, str]:
+    """GITHUB_TOKEN as a per-process git config through the environment (git >= 2.31), so it
+    is neither written into .git/config nor visible in the process argument list."""
     if not Config.GITHUB_TOKEN:
-        return []
+        return {}
     basic = base64.b64encode(f"x-access-token:{Config.GITHUB_TOKEN}".encode()).decode()
-    return ["-c", f"http.https://github.com/.extraheader=Authorization: Basic {basic}"]
+    return {"GIT_CONFIG_COUNT": "1", "GIT_CONFIG_KEY_0": "http.https://github.com/.extraheader", "GIT_CONFIG_VALUE_0": f"Authorization: Basic {basic}"}
 
 
 def _run(args: list[str], cwd: Path | None = None, text: bool = True, stdin: str | None = None, no_lazy_fetch: bool = False, auth: bool = False) -> str | bytes:
-    env = None
+    env = {**os.environ}
     if no_lazy_fetch:
         # Never reach out to the remote for a missing object; report it as missing instead.
-        env = {**os.environ, "GIT_NO_LAZY_FETCH": "1"}
-    proc = subprocess.run(["git", *(_auth_args() if auth else []), *args], cwd=cwd, capture_output=True, input=stdin.encode() if stdin is not None else None, env=env)
+        env["GIT_NO_LAZY_FETCH"] = "1"
+    if auth:
+        env.update(_auth_env())
+    proc = subprocess.run(["git", *args], cwd=cwd, capture_output=True, input=stdin.encode() if stdin is not None else None, env=env)
     if proc.returncode != 0:
         raise GitError(f"git {' '.join(args)} failed: {proc.stderr.decode(errors='replace').strip()}")
     return proc.stdout.decode(errors="replace") if text else proc.stdout
@@ -55,15 +61,28 @@ def _blob_filter() -> str:
     return f"--filter=blob:limit={Config.MAX_FILE_BYTES}"
 
 
+def _run_with_auth_fallback(args: list[str], cwd: Path | None = None) -> None:
+    """Try with GITHUB_TOKEN first (private repos), then anonymously (public repos still work
+    when the token is revoked or scoped elsewhere)."""
+    if not Config.GITHUB_TOKEN:
+        _run(args, cwd=cwd)
+        return
+    try:
+        _run(args, cwd=cwd, auth=True)
+    except GitError as e:
+        log.warning("git with GITHUB_TOKEN failed (%s); retrying anonymously", str(e)[:120])
+        _run(args, cwd=cwd)
+
+
 def clone_or_fetch(url: str) -> Path:
     owner, name = parse_github_url(url)
     dest = repo_dir(owner, name)
     if (dest / ".git").exists():
-        _run(["fetch", "--tags", "--force", "--prune", _blob_filter(), "origin"], cwd=dest, auth=True)
+        _run_with_auth_fallback(["fetch", "--tags", "--force", "--prune", _blob_filter(), "origin"], cwd=dest)
         return dest
     dest.parent.mkdir(parents=True, exist_ok=True)
     clean = f"https://github.com/{owner}/{name}.git"
-    _run(["clone", _blob_filter(), "--no-checkout", clean, str(dest)], auth=True)
+    _run_with_auth_fallback(["clone", _blob_filter(), "--no-checkout", clean, str(dest)])
     return dest
 
 
@@ -147,4 +166,5 @@ def ls_tree(repo: Path, sha: str) -> list[TreeEntry]:
 
 
 def read_blob(repo: Path, sha: str, path: str) -> bytes:
-    return _run(["show", f"{sha}:{path}"], cwd=repo, text=False)  # type: ignore[return-value]
+    # auth=True: a blob over the clone's size limit may need a lazy fetch, which must carry the token for private repos
+    return _run(["show", f"{sha}:{path}"], cwd=repo, text=False, auth=True)  # type: ignore[return-value]

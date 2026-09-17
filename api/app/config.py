@@ -44,8 +44,10 @@ class Config:
     DEMO_MODE: bool = _bool(os.environ.get("DEMO_MODE"), False)
     # Per-IP leaky bucket for model-calling endpoints: burst LLM_RATE_CAPACITY, then one per LLM_RATE_LEAK_SECONDS
     RATE_LIMIT_ENABLED: bool = _bool(os.environ.get("RATE_LIMIT_ENABLED"), True)
-    LLM_RATE_CAPACITY: float = float(os.environ.get("LLM_RATE_CAPACITY", "10"))
-    LLM_RATE_LEAK_SECONDS: float = float(os.environ.get("LLM_RATE_LEAK_SECONDS", "20"))
+    LLM_RATE_CAPACITY: float = max(1.0, float(os.environ.get("LLM_RATE_CAPACITY", "10")))
+    LLM_RATE_LEAK_SECONDS: float = max(0.001, float(os.environ.get("LLM_RATE_LEAK_SECONDS", "20")))
+    # How many proxy hops set X-Forwarded-For in front of us (Vercel: 1). 0 = trust only the socket address.
+    TRUSTED_PROXY_HOPS: int = int(os.environ.get("TRUSTED_PROXY_HOPS", "1" if _ON_VERCEL else "0"))
     # Optional token for private repos (clone, tarball, raw files, tags API)
     GITHUB_TOKEN: str | None = os.environ.get("GITHUB_TOKEN") or None
     REPO_CACHE_DIR: Path = Path(os.environ.get("REPO_CACHE_DIR", "./data/repos")).resolve()

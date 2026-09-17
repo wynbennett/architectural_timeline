@@ -24,7 +24,7 @@ from ..ingest.inventory import (
 )
 from ..schemas import Edge, ModuleNode, SnippetNode, SystemNode, Tier1Graph, Tier2Graph, Tier3Graph
 from .client import structured_call
-from .prompts import PROMPT_VERSION, render_prompt, system_prompt  # noqa: F401  (PROMPT_VERSION re-exported)
+from .prompts import PROMPT_VERSION, render_prompt, system_prompt
 
 log = logging.getLogger(__name__)
 
@@ -58,11 +58,12 @@ class TagContext:
     prev_tag: str | None
     prev_graph: dict | None  # {"tier1":..., "tier2":..., "tier3":...}
     prev_files: dict[str, str] | None = None  # path -> blob sha at the reference tag
+    prev_prompt_version: str | None = None    # reuse only when the neighbor was made with the current prompts
 
     def files_unchanged(self, paths: list[str]) -> bool:
         """True when the inventory files under `paths` are the same set with identical content
         as at the reference tag, so work done there can be reused verbatim."""
-        if not self.prev_files:
+        if not self.prev_files or self.prev_prompt_version != PROMPT_VERSION:
             return False
         cur = {f.path: f.sha for f in self.inv.under(paths)}
         if not cur or any(not sha for sha in cur.values()):

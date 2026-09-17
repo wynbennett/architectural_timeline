@@ -7,7 +7,7 @@ from ..config import Config
 from ..db import session_scope
 from ..llm.overview import write_overview
 from ..models import Tag
-from ..ratelimit import llm_rate_limited
+from ..ratelimit import rate_limit_response
 
 bp = Blueprint("graphs", __name__)
 
@@ -38,7 +38,6 @@ def get_graph(repo_id: int, tag_name: str):
 
 
 @bp.post("/repos/<int:repo_id>/tags/<path:tag_name>/overview")
-@llm_rate_limited
 def write_overview_route(repo_id: int, tag_name: str):
     """Generate (or regenerate with {"force": true}) the written overview for a tag. One model call, cached."""
     body = request.get_json(silent=True) or {}
@@ -47,5 +46,7 @@ def write_overview_route(repo_id: int, tag_name: str):
         if tag is None or tag.graph is None:
             return jsonify({"error": "no graph for this tag"}), 404
         tag_id, cached = tag.id, bool(tag.graph.overview) and not body.get("force")
+    if not cached and (limited := rate_limit_response()) is not None:
+        return limited
     text = write_overview(tag_id, force=bool(body.get("force")))
     return jsonify({"overview": text, "cached": cached, "model": Config.MODEL})

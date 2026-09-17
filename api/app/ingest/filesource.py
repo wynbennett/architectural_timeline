@@ -9,6 +9,7 @@ import requests
 
 from ..config import Config
 from . import git
+from .github import auth_headers
 
 
 class FileSource(Protocol):
@@ -34,9 +35,10 @@ class GitHubRawFileSource:
 
     @lru_cache(maxsize=256)
     def _fetch(self, url: str) -> str | None:
-        from .github import auth_headers
-
-        resp = self.session.get(url, headers=auth_headers(), timeout=20)
+        headers = auth_headers()
+        resp = self.session.get(url, headers=headers, timeout=20)
+        if resp.status_code != 200 and headers:
+            resp = self.session.get(url, timeout=20)  # public repo with a bad token: try anonymously
         if resp.status_code != 200:
             return None
         return resp.text
