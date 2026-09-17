@@ -45,7 +45,8 @@ def chat():
             if other is not None and other.graph is not None:
                 earlier, later = (other, tag) if other.order_index < tag.order_index else (tag, other)
                 g = lambda t: {"tier1": t.graph.tier1, "tier2": t.graph.tier2, "tier3": t.graph.tier3}  # noqa: E731
-                d = diff_graphs(g(later), g(earlier))
+                files = lambda t: {f.path: f.blob_sha for f in t.files if f.blob_sha}  # noqa: E731
+                d = diff_graphs(g(later), g(earlier), files(later), files(earlier))
                 cached = s.scalar(_select(ChangeSummary).where(ChangeSummary.from_tag_id == earlier.id, ChangeSummary.to_tag_id == later.id))
                 ctx.comparison = (
                     f"The user is comparing tag {earlier.name} (earlier) with tag {later.name} (later).\n"

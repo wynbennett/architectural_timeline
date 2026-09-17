@@ -4,6 +4,7 @@ import { useAppStore } from '../../store/useAppStore'
 import { edgeKey, tier3Key, type DiffScope, type GraphEdge, type GraphResponse, type Tier } from '../../types/graph'
 import { nodeTypes } from './nodes/GraphNodes'
 import { edgeTypes } from './StatusEdge'
+import { scopeDiff } from '../../lib/diffScope'
 import { useElkLayout } from './useElkLayout'
 import { Breadcrumb } from './Breadcrumb'
 import { GenerateEmptyState } from '../timeline/GenerateEmptyState'
@@ -41,14 +42,6 @@ function scopeOf(g: GraphResponse, tier: Tier, systemId: string | null, moduleId
   return { nodes: [], edges: [] as GraphEdge[] }
 }
 
-function diffScopeOf(diff: DiffScope | undefined, tier: Tier, systemId: string | null, moduleId: string | null, all: { tier1: DiffScope; tier2: Record<string, DiffScope>; tier3: Record<string, DiffScope> } | null) {
-  if (!all) return diff
-  if (tier === 1) return all.tier1
-  if (tier === 2 && systemId) return all.tier2[systemId]
-  if (tier === 3 && systemId && moduleId) return all.tier3[tier3Key(systemId, moduleId)]
-  return undefined
-}
-
 function Canvas() {
   const { graph, tier, systemId, moduleId, selectedNodeId, drillInto, setHoverRange, currentTag, compareMode, compare, compareGraph, theme } = useAppStore()
   const { fitView } = useReactFlow()
@@ -56,7 +49,7 @@ function Canvas() {
   const { rawNodes, rawEdges, key } = useMemo(() => {
     if (!graph) return { rawNodes: [] as Node[], rawEdges: [] as Edge[], key: 'empty' }
     const scope = scopeOf(graph, tier, systemId, moduleId)
-    const diff = compareMode && compare ? diffScopeOf(undefined, tier, systemId, moduleId, compare.diff) : undefined
+    const diff = compareMode && compare ? scopeDiff(compare.diff, tier, systemId, moduleId) : undefined
     const pair = compareMode && compare ? { from: compare.from, to: compare.to } : undefined
     const nodes: Node[] = scope.nodes.map((n) => ({ ...n, position: { x: 0, y: 0 }, data: { ...n.data, status: diff?.nodes[n.id] } }))
     const names = new Map(nodes.map((n) => [n.id, String((n.data as { label: string }).label)]))

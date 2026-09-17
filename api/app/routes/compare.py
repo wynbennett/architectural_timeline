@@ -21,6 +21,10 @@ def _graph_dict(t: Tag) -> dict:
     return {"tier1": t.graph.tier1, "tier2": t.graph.tier2, "tier3": t.graph.tier3}
 
 
+def _files(t: Tag) -> dict[str, str]:
+    return {f.path: f.blob_sha for f in t.files if f.blob_sha}
+
+
 def _load_pair(s, repo_id: int, from_name: str, to_name: str) -> tuple[Tag, Tag] | None:
     a = s.scalar(select(Tag).where(Tag.repo_id == repo_id, Tag.name == from_name))
     b = s.scalar(select(Tag).where(Tag.repo_id == repo_id, Tag.name == to_name))
@@ -40,7 +44,7 @@ def compare(repo_id: int):
         if pair is None:
             return jsonify({"error": "both tags need a generated graph"}), 404
         a, b = pair
-        d = diff_graphs(_graph_dict(b), _graph_dict(a))
+        d = diff_graphs(_graph_dict(b), _graph_dict(a), _files(b), _files(a))
         cached = s.scalar(select(ChangeSummary).where(ChangeSummary.from_tag_id == a.id, ChangeSummary.to_tag_id == b.id))
         return jsonify({"from": a.name, "to": b.name, "diff": d, "summary": cached.summary if cached else None})
 
@@ -57,11 +61,12 @@ def summarize(repo_id: int):
         if cached and not body.get("force"):
             return jsonify({"from": a.name, "to": b.name, "summary": cached.summary, "cached": True})
         ga, gb = _graph_dict(a), _graph_dict(b)
+        fa, fb = _files(a), _files(b)
         owner, name, a_id, b_id, a_name, b_name = a.repo.owner, a.repo.name, a.id, b.id, a.name, b.name
     if (limited := rate_limit_response()) is not None:
         return limited
 
-    d = diff_graphs(gb, ga)
+    d = diff_graphs(gb, ga, fb, fa)
     slim = lambda g: {"tier1": g["tier1"], "tier2": g["tier2"]}  # noqa: E731  (tier 3 is too large and not needed)
     prompt = render_prompt(
         "change_summary",

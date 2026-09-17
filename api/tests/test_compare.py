@@ -19,9 +19,18 @@ def test_diff_graphs():
            "tier2": {"a": {"nodes": [{"id": "m1", "name": "M1", "paths": ["a/x.py"]}, {"id": "m2", "name": "M2", "paths": ["a/y.py"]}], "edges": []}}, "tier3": {}}
     d = diff_graphs(cur, prev)
     assert d["tier1"]["nodes"] == {"a": "changed", "new": "added", "gone": "removed"}
+    assert d["tier1"]["edge_counts"] == {"added": 1, "removed": 1, "unchanged": 0}
     assert d["tier1"]["edges"] == {"a|new|reads": "added", "a|gone|calls": "removed"}
     assert d["tier1"]["counts"]["added"] == 1
     assert d["tier2"]["a"]["nodes"] == {"m1": "unchanged", "m2": "added"}
+    # modified: same paths, different file content under them
+    prev2 = {"tier1": {"nodes": [{"id": "a", "name": "A", "kind": "api", "paths": ["a"]}], "edges": []}, "tier2": {}, "tier3": {}}
+    cur2 = {"tier1": {"nodes": [{"id": "a", "name": "A", "kind": "api", "paths": ["a"]}], "edges": []}, "tier2": {}, "tier3": {}}
+    same = diff_graphs(cur2, prev2, {"a/x.py": "111"}, {"a/x.py": "111"})
+    assert same["tier1"]["nodes"] == {"a": "unchanged"}
+    mod = diff_graphs(cur2, prev2, {"a/x.py": "222"}, {"a/x.py": "111"})
+    assert mod["tier1"]["nodes"] == {"a": "modified"} and mod["tier1"]["counts"]["modified"] == 1
+    assert diff_graphs(cur2, prev2)["tier1"]["nodes"] == {"a": "unchanged"}  # no hashes: never guesses
     digest = diff_digest(cur, prev, d)
     assert "systems added: N (new)" in digest and "removed: G (gone)" in digest and "modules of A: added: m2" in digest
 

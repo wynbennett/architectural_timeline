@@ -16,9 +16,11 @@ function AskButton({ kind, name }: { kind: string; name: string }) {
   )
 }
 
+const STATUS_WORD: Record<DiffStatus, string> = { added: 'added', removed: 'removed', changed: 're-scoped', modified: 'modified', unchanged: '' }
+
 function StatusTag({ status }: { status?: DiffStatus }) {
   if (!status || status === 'unchanged') return null
-  return <span className={`status-tag status-${status}`}>{status}</span>
+  return <span className={`status-tag status-${status}`}>{STATUS_WORD[status]}</span>
 }
 
 const KIND_ICON: Record<SystemKind, string> = { api: '⇄', service: '⚙', frontend: '▣', worker: '⟳', datastore: '🛢', external: '☁' }
