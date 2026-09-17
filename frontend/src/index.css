@@ -38,7 +38,7 @@ input:focus, textarea:focus, select:focus { outline: none; border-color: var(--a
 .timeline-label { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0; font-size: 11px; min-height: 22px; }
 .timeline-title { color: var(--muted); text-transform: uppercase; font-size: 10px; letter-spacing: 0.08em; }
 .timeline-empty { color: var(--muted); padding: 4px 0; }
-.timeline-slider { padding: 2px 18px 10px; }
+.timeline-slider { padding: 2px 18px 28px; }  /* room for the tag labels under the rail */
 .rc-slider-rail { background: var(--border); height: 4px; }
 .rc-slider-track { background: var(--accent-2); height: 4px; }
 .rc-slider-handle { border-color: var(--accent); background: var(--bg); opacity: 1; width: 14px; height: 14px; margin-top: -5px; }
@@ -237,7 +237,7 @@ input:focus, textarea:focus, select:focus { outline: none; border-color: var(--a
 .intro-hero { position: relative; padding: 28px 32px 22px; border-radius: 16px; border: 1px solid var(--border); background: linear-gradient(135deg, var(--bg-2), var(--bg-3)); box-shadow: var(--shadow); overflow: hidden; }
 .intro-hero::before { content: ""; position: absolute; inset: -40% -20% auto auto; width: 420px; height: 420px; border-radius: 50%; background: radial-gradient(closest-side, var(--selection), transparent); pointer-events: none; }
 .intro-kicker { font-size: 11px; text-transform: uppercase; letter-spacing: 0.18em; color: var(--muted); }
-.intro-title { font-size: 46px; margin: 2px 0 10px; letter-spacing: -0.02em; line-height: 1; background: linear-gradient(90deg, var(--accent), var(--mod)); -webkit-background-clip: text; background-clip: text; color: transparent; display: inline-block; }
+.intro-title { font-size: 46px; margin: 2px 0 10px; letter-spacing: -0.02em; line-height: 1.2; padding-bottom: 6px; background: linear-gradient(90deg, var(--accent), var(--mod)); -webkit-background-clip: text; background-clip: text; color: transparent; display: inline-block; }
 .intro-lede { font-size: 16px; line-height: 1.55; max-width: 720px; color: var(--text); margin-top: 0; }
 .feature-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(175px, 1fr)); gap: 12px; margin-top: 18px; }
 .feature { padding: 12px 14px; border-radius: 10px; border: 1px solid var(--border); background: var(--bg-2); line-height: 1.45; }
