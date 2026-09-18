@@ -10,7 +10,7 @@ import { CompareBanner } from '../timeline/CompareBanner'
 import { ThemeToggle } from './ThemeToggle'
 
 export function AppShell() {
-  const { health, repos, repo, selectRepo, error, toast, dismissToast, job, goToIntro } = useAppStore()
+  const { health, repos, repo, selectRepo, error, toast, dismissToast, job, goToIntro, refreshRepo, refreshing } = useAppStore()
 
   useEffect(() => { if (toast) { const t = window.setTimeout(dismissToast, 4000); return () => window.clearTimeout(t) } }, [toast, dismissToast])
 
@@ -24,6 +24,16 @@ export function AppShell() {
               <option value="" disabled>select a repo</option>
               {repos.map((r) => <option key={r.id} value={r.id}>{r.owner}/{r.name} ({r.generated_count}/{r.tag_count})</option>)}
             </select>
+          )}
+          {repo && (
+            <button
+              className="btn tiny"
+              disabled={refreshing || !health?.generation_enabled || !!health?.demo_mode || (job !== null && (job.status === 'queued' || job.status === 'running'))}
+              onClick={() => refreshRepo()}
+              title={health?.demo_mode ? 'Demo mode: pulling and generating is disabled' : !health?.generation_enabled ? 'Generation is disabled on this deployment' : 'Fetch the latest tags from GitHub and generate any newest ones that are missing'}
+            >
+              {refreshing ? '↻ pulling…' : '↻ pull latest'}
+            </button>
           )}
           {health?.demo_mode && <span className="demo-chip" title="Loading new repositories and generating tags is disabled on this public demo">demo mode</span>}
         </div>

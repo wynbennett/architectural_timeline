@@ -69,6 +69,8 @@ cd api && .venv/bin/python -m app.cli generate https://github.com/vitejs/vite --
   narrative of the transition (one call, cached). *Ask what changed* sends the diff to chat.
 - **Chat**: grounded in the generated graph plus read-file tools over the repo at that tag.
   Citations like `path:12-40` open the code pane. The `?` on any node pre-fills a question.
+- **Pull latest**: the header button re-fetches a repo's tags from GitHub and generates any of
+  the newest three that are missing (`POST /api/repos/<id>/refresh`).
 - **Intro page, light/dark**: the landing page explains the tool and lists generated repos;
   the theme toggle persists per browser (light by default).
 

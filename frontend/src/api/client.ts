@@ -15,6 +15,8 @@ export const api = {
   getRepo: (id: number) => fetch(`/api/repos/${id}`).then(json<RepoDetail>),
   createRepo: (url: string) =>
     fetch('/api/repos', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }) }).then(json<{ repo_id: number; job_id: number }>),
+  refreshRepo: (repoId: number) =>
+    fetch(`/api/repos/${repoId}/refresh`, { method: 'POST' }).then(json<{ repo_id: number; new_tags: string[]; pending: string[]; job_id: number | null }>),
   generateTag: (repoId: number, tag: string) =>
     fetch(`/api/repos/${repoId}/tags/${encodeURIComponent(tag)}/generate`, { method: 'POST' }).then(json<{ job_id: number }>),
   getJob: (id: number) => fetch(`/api/jobs/${id}`).then(json<Job>),

@@ -45,6 +45,8 @@ interface AppState {
   selectRepo: (id: number, preferredTag?: string | null) => Promise<void>
   selectTag: (name: string) => Promise<void>
   generateTag: (name: string) => Promise<void>
+  refreshRepo: () => Promise<void>
+  refreshing: boolean
   drillInto: (nodeId: string) => void
   goToTier: (tier: Tier) => void
   selectSnippet: (s: SnippetNode) => void
@@ -151,6 +153,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   timelineMode: loadTimelineMode(),
   leftTab: 'diagram',
   overviewBusy: false,
+  refreshing: false,
   screen: 'intro',
   theme: loadTheme(),
 
@@ -251,6 +254,24 @@ export const useAppStore = create<AppState>((set, get) => ({
       startPolling(job_id)
     } catch (e) {
       set({ error: (e as Error).message })
+    }
+  },
+
+  refreshRepo: async () => {
+    const repo = get().repo
+    if (!repo || get().refreshing) return
+    set({ refreshing: true, error: null })
+    try {
+      const r = await api.refreshRepo(repo.id)
+      const fresh = await api.getRepo(repo.id)
+      set({ repo: fresh, repos: await api.listRepos() })
+      const found = r.new_tags.length ? `found ${r.new_tags.length} new tag${r.new_tags.length === 1 ? '' : 's'}: ${r.new_tags.join(', ')}` : 'no new tags'
+      set({ toast: r.job_id ? `${found}; generating ${r.pending.join(', ')}` : `${found}; up to date` })
+      if (r.job_id) startPolling(r.job_id)
+    } catch (e) {
+      set({ error: (e as Error).message })
+    } finally {
+      set({ refreshing: false })
     }
   },
 

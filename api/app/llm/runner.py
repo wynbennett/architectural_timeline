@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 
 from ..config import Config
 from ..db import session_scope
-from ..models import GenerationJob, JobStatus
+from ..models import GenerationJob, JobStatus, Tag
 from . import jobs as gen
 
 log = logging.getLogger(__name__)
@@ -56,6 +56,20 @@ def enqueue_repo_load(repo_id: int, n_tags: int, tag_pattern: str | None = None)
         s.flush()
         job_id = job.id
     _executor.submit(_run_repo_load, job_id, repo_id, n_tags, tag_pattern)
+    return job_id
+
+
+def enqueue_newest(repo_id: int, n_tags: int) -> int | None:
+    """Queue generation for the newest n tags that have no graph yet (tags already fetched).
+    Returns None when nothing needs generating."""
+    ids = gen.select_newest(repo_id, n_tags)
+    with session_scope() as s:
+        pending = [tid for tid in ids if s.get(Tag, tid).graph is None]
+    if not pending:
+        return None
+    job_id = gen.create_job(repo_id, pending)
+    if Config.GENERATION_MODE != "chunked":
+        _executor.submit(_run_job, job_id)
     return job_id
 
 

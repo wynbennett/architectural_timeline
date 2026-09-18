@@ -118,3 +118,37 @@ def test_overview_route(client, seeded_repo, fixture_repo, monkeypatch):
         r = client.post(f"/api/repos/{repo_id}/tags/v0.2.0/overview")
         assert r.get_json()["cached"] is True and m.call_count == 1
     assert client.get(f"/api/repos/{repo_id}/tags/v0.2.0/graph").get_json()["overview"].startswith("## What it is")
+
+
+def test_refresh_repo(client, seeded_repo, fixture_repo, monkeypatch, tmp_path):
+    import shutil
+    import subprocess
+
+    from sqlalchemy import delete
+
+    from app.llm import jobs, runner
+    from app.models import GenerationJob
+
+    # work on a copy so the shared fixture stays at two tags
+    repo_copy = tmp_path / "repo"
+    shutil.copytree(fixture_repo, repo_copy)
+    monkeypatch.setattr(git, "clone_or_fetch", lambda url: repo_copy)
+    monkeypatch.setattr(git, "repo_dir", lambda owner, name: repo_copy)
+    try:
+        r = client.post(f"/api/repos/{seeded_repo}/refresh")  # nothing new: no job
+        assert r.status_code == 200 and r.get_json()["new_tags"] == [] and r.get_json()["job_id"] is None
+
+        (repo_copy / "NEW.md").write_text("new\n")
+        for cmd in (["git", "add", "-A"], ["git", "commit", "-q", "-m", "v3"], ["git", "tag", "v0.3.0"]):
+            subprocess.run(cmd, cwd=repo_copy, check=True, capture_output=True)
+        with patch.object(runner._executor, "submit") as submit:
+            r = client.post(f"/api/repos/{seeded_repo}/refresh")
+        body = r.get_json()
+        assert r.status_code == 202 and body["new_tags"] == ["v0.3.0"] and body["pending"] == ["v0.3.0"] and body["job_id"]
+        assert submit.called
+        with session_scope() as s:
+            assert s.get(jobs.GenerationJob, body["job_id"]).state["tags"]
+    finally:
+        with session_scope() as s:
+            s.execute(delete(GenerationJob).where(GenerationJob.repo_id == seeded_repo))
+            s.execute(delete(Tag).where(Tag.repo_id == seeded_repo, Tag.name == "v0.3.0"))

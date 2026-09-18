@@ -6,6 +6,7 @@ from sqlalchemy import func, select
 from ..config import Config
 from ..db import session_scope
 from ..ingest.git import GitError, parse_github_url
+from ..llm import jobs as gen
 from ..llm import runner
 from ..models import Graph, Repo, Tag, TagStatus
 from ..ratelimit import rate_limit_response
@@ -75,6 +76,32 @@ def create_repo():
         repo_id = repo.id
     job_id = runner.enqueue_repo_load(repo_id, n_tags=int(body.get("tags") or Config.TAGS_ON_LOAD))
     return jsonify({"repo_id": repo_id, "job_id": job_id}), 202
+
+
+@bp.post("/repos/<int:repo_id>/refresh")
+def refresh_repo(repo_id: int):
+    """Pull the latest tags from GitHub and generate the newest ones that are missing."""
+    _require_generation()
+    with session_scope() as s:
+        repo = s.get(Repo, repo_id)
+        if repo is None:
+            abort(404)
+        before = {t.name for t in repo.tags}
+    try:
+        gen.load_repo(repo_id)  # git fetch (local) or the tags API (chunked); seconds, so done inline
+    except Exception as e:
+        return jsonify({"error": f"could not fetch: {e}"}), 502
+    with session_scope() as s:
+        repo = s.get(Repo, repo_id)
+        new_tags = [t.name for t in repo.tags if t.name not in before]
+        ids = gen.select_newest(repo_id, Config.TAGS_ON_LOAD)
+        pending = [s.get(Tag, tid).name for tid in ids if s.get(Tag, tid).graph is None]
+    job_id = None
+    if pending:
+        if (limited := rate_limit_response()) is not None:
+            return limited
+        job_id = runner.enqueue_newest(repo_id, Config.TAGS_ON_LOAD)
+    return jsonify({"repo_id": repo_id, "new_tags": new_tags, "pending": pending, "job_id": job_id}), 202 if job_id else 200
 
 
 @bp.get("/repos/<int:repo_id>")
