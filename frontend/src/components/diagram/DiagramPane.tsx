@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react'
-import { Background, Controls, MarkerType, ReactFlow, ReactFlowProvider, useReactFlow, type Edge, type Node } from '@xyflow/react'
+import { useEffect, useMemo, useRef } from 'react'
+import { Background, Controls, MarkerType, ReactFlow, ReactFlowProvider, useNodesInitialized, useNodesState, useReactFlow, useStore, type Edge, type Node } from '@xyflow/react'
 import { useAppStore } from '../../store/useAppStore'
 import { edgeKey, tier3Key, type DiffScope, type GraphEdge, type GraphResponse, type Tier } from '../../types/graph'
 import { nodeTypes } from './nodes/GraphNodes'
@@ -75,40 +75,48 @@ function Canvas() {
   }, [graph, tier, systemId, moduleId, currentTag, compareMode, compare, compareGraph])
 
   const laid = useElkLayout(rawNodes, rawEdges, key)
-  const nodes = useMemo(
-    () => laid.nodes.map((n) => (n.type === 'snippet' ? { ...n, data: { ...n.data, selected: n.id === selectedNodeId } } : n)),
-    [laid.nodes, selectedNodeId],
-  )
-
-  const canvasRef = useRef<HTMLDivElement>(null)
-  const fit = useCallback(() => { void fitView({ padding: 0.15, duration: 200 }) }, [fitView])
-
-  // fit after every layout, once React Flow has measured the new nodes
+  // Controlled node state. React Flow reports measured sizes through onNodesChange and only
+  // considers nodes "initialized" once the node objects it is given carry those sizes; a
+  // queued fitView() resolves at that moment. With plain props it would wait indefinitely.
+  const [nodes, setNodes, onNodesChange] = useNodesState<Node>([])
   useEffect(() => {
-    if (laid.key === key && laid.nodes.length) {
-      let raf2 = 0
-      const raf1 = window.requestAnimationFrame(() => { raf2 = window.requestAnimationFrame(fit) })
-      const t = window.setTimeout(fit, 250)
-      return () => { window.cancelAnimationFrame(raf1); window.cancelAnimationFrame(raf2); window.clearTimeout(t) }
-    }
-  }, [laid, key, fit])
+    setNodes(laid.nodes.map((n) => (n.type === 'snippet' ? { ...n, data: { ...n.data, selected: n.id === selectedNodeId } } : n)))
+  }, [laid.nodes, selectedNodeId, setNodes])
 
-  // and whenever the canvas itself changes size (panel drag, window resize, late initial layout)
+  // Viewport policy: after every new layout the view is "automatic" and fits itself, also when
+  // the canvas changes size (splitter drag, a banner appearing, the late first measurement on
+  // a cold load). As soon as the user pans or zooms (wheel, drag, or the zoom buttons), the
+  // view is theirs until the next layout. Our own fits also fire onMoveEnd, so they are
+  // flagged and ignored.
+  const userMoved = useRef(false)
+  const fittedKey = useRef<string | null>(null)
+  const nodesInitialized = useNodesInitialized()
+  const canvasSize = useStore((s) => `${s.width}x${s.height}`)
+  const ready = laid.key === key && laid.nodes.length > 0
+  const autoFit = (duration: number) => { void fitView({ padding: 0.15, duration }) }
+  const markUserMove = () => { userMoved.current = true }
+
   useEffect(() => {
-    const el = canvasRef.current
-    if (!el) return
-    let t = 0
-    const ro = new ResizeObserver(() => { window.clearTimeout(t); t = window.setTimeout(fit, 120) })
-    ro.observe(el)
-    return () => { ro.disconnect(); window.clearTimeout(t) }
-  }, [fit])
+    if (!ready || !nodesInitialized || fittedKey.current === laid.key) return
+    fittedKey.current = laid.key
+    userMoved.current = false
+    autoFit(200)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [laid.key, ready, nodesInitialized])
+
+  useEffect(() => {
+    if (ready && nodesInitialized && !userMoved.current) autoFit(0)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canvasSize])
 
   const empty = laid.key === key && laid.nodes.length === 0
   return (
-    <div className="diagram-canvas" ref={canvasRef}>
+    <div className="diagram-canvas">
       <ReactFlow
+        onMoveEnd={(event) => { if (event) markUserMove() }}  // wheel or drag; programmatic moves (our fits) carry no source event
         nodes={nodes}
         edges={laid.edges}
+        onNodesChange={onNodesChange}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         onNodeClick={(_, n) => { if ((n.data as { status?: string }).status !== 'removed') drillInto(n.id) }}
@@ -121,7 +129,7 @@ function Canvas() {
         colorMode={theme}
       >
         <Background gap={24} />
-        <Controls showInteractive={false} />
+        <Controls showInteractive={false} onZoomIn={markUserMove} onZoomOut={markUserMove} onFitView={markUserMove} />
       </ReactFlow>
       {empty && <div className="diagram-empty-note">Nothing to show at this level.</div>}
     </div>
