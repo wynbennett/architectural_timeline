@@ -249,8 +249,9 @@ input:focus, textarea:focus, select:focus { outline: none; border-color: var(--a
 .intro h2 { font-size: 14px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin: 28px 0 10px; }
 .repo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; }
 .repo-card { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg-2); cursor: pointer; text-align: left; box-shadow: var(--shadow); }
-.repo-card:hover:not(:disabled) { border-color: var(--accent); transform: translateY(-1px); }
-.repo-card:disabled { opacity: 0.5; cursor: default; }
+.repo-card { text-decoration: none; color: var(--text); }
+.repo-card:hover:not(.disabled) { border-color: var(--accent); transform: translateY(-1px); }
+.repo-card.disabled { opacity: 0.5; cursor: default; }
 .repo-card-name { font-size: 14px; }
 .repo-card-meta { font-size: 11px; color: var(--muted); }
 .intro-load .repo-form { margin-bottom: 8px; }

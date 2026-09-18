@@ -39,9 +39,10 @@ interface AppState {
   init: () => Promise<void>
   openApp: () => void
   goToIntro: () => void
+  applyUrl: () => Promise<void>
   setTheme: (t: 'light' | 'dark') => void
   loadRepo: (url: string) => Promise<void>
-  selectRepo: (id: number) => Promise<void>
+  selectRepo: (id: number, preferredTag?: string | null) => Promise<void>
   selectTag: (name: string) => Promise<void>
   generateTag: (name: string) => Promise<void>
   drillInto: (nodeId: string) => void
@@ -75,6 +76,23 @@ export function visibleTags(tags: TagInfo[], mode: TimelineMode, keep: (string |
   if (mode === 'generated') return tags.filter(interesting)
   const recentFrom = Math.max(0, tags.length - RECENT_TAGS)
   return tags.filter((t, i) => i >= recentFrom || interesting(t))
+}
+
+/** URL scheme: /r/<owner>/<name>[/<tag>]. Anything else is the intro page. */
+export function repoPath(owner: string, name: string, tag?: string | null): string {
+  return `/r/${encodeURIComponent(owner)}/${encodeURIComponent(name)}${tag ? `/${encodeURIComponent(tag)}` : ''}`
+}
+
+function parsePath(pathname: string): { owner: string; name: string; tag: string | null } | null {
+  const m = /^\/r\/([^/]+)\/([^/]+)(?:\/([^/]+))?\/?$/.exec(pathname)
+  return m ? { owner: decodeURIComponent(m[1]), name: decodeURIComponent(m[2]), tag: m[3] ? decodeURIComponent(m[3]) : null } : null
+}
+
+let applyingUrl = false
+function setUrl(path: string, push: boolean) {
+  if (applyingUrl || window.location.pathname === path) return
+  if (push) window.history.pushState(null, '', path)
+  else window.history.replaceState(null, '', path)
 }
 
 function loadTheme(): 'light' | 'dark' {
@@ -143,11 +161,30 @@ export const useAppStore = create<AppState>((set, get) => ({
       set({ health, repos })
     } catch (e) {
       set({ error: `backend unreachable: ${(e as Error).message}` })
+      return
+    }
+    window.addEventListener('popstate', () => { void get().applyUrl() })
+    await get().applyUrl()
+  },
+
+  /** Make the app state match the address bar (initial load and back/forward). */
+  applyUrl: async () => {
+    const target = parsePath(window.location.pathname)
+    applyingUrl = true
+    try {
+      if (!target) { pollRun++; set({ screen: 'intro', job: null }); return }
+      const repo = get().repos.find((r) => r.owner === target.owner && r.name === target.name)
+      if (!repo) { set({ screen: 'intro', error: `no repository ${target.owner}/${target.name} here` }); window.history.replaceState(null, '', '/'); return }
+      if (get().repo?.id !== repo.id) await get().selectRepo(repo.id, target.tag)
+      else if (target.tag && target.tag !== get().currentTag) await get().selectTag(target.tag)
+      set({ screen: 'app', error: null })
+    } finally {
+      applyingUrl = false
     }
   },
 
   openApp: () => set({ screen: 'app', error: null }),
-  goToIntro: () => { pollRun++; set({ screen: 'intro', job: null }); void api.listRepos().then((repos) => set({ repos })).catch(() => undefined) },
+  goToIntro: () => { pollRun++; set({ screen: 'intro', job: null }); setUrl('/', true); void api.listRepos().then((repos) => set({ repos })).catch(() => undefined) },
   setTheme: (theme) => {
     try { localStorage.setItem('theme', theme) } catch { /* ignore */ }
     applyTheme(theme)
@@ -160,6 +197,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       const { repo_id, job_id } = await api.createRepo(url)
       const repo = await api.getRepo(repo_id)
       set({ repo, currentTag: null, graph: null, files: [], tier: 1, systemId: null, moduleId: null, selectedNodeId: null, openFile: null, chat: [], compareMode: false, compareTag: null, compareGraph: null, compare: null })
+      setUrl(repoPath(repo.owner, repo.name), true)
       startPolling(job_id)
       set({ repos: await api.listRepos() })
     } catch (e) {
@@ -167,10 +205,12 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
 
-  selectRepo: async (id) => {
+  selectRepo: async (id, preferredTag = null) => {
     const repo = await api.getRepo(id)
     set({ repo, currentTag: null, graph: null, files: [], tier: 1, systemId: null, moduleId: null, selectedNodeId: null, openFile: null, chat: [], job: null, compareMode: false, compareTag: null, compareGraph: null, compare: null })
-    const tag = newestGeneratedTag(repo.tags) ?? repo.tags[repo.tags.length - 1]
+    setUrl(repoPath(repo.owner, repo.name), true)
+    const wanted = preferredTag ? repo.tags.find((t) => t.name === preferredTag) : undefined
+    const tag = wanted ?? newestGeneratedTag(repo.tags) ?? repo.tags[repo.tags.length - 1]
     if (tag) await get().selectTag(tag.name)
   },
 
@@ -179,6 +219,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (!repo) return
     const reqId = ++graphRequest
     set({ currentTag: name, graphLoading: true })
+    setUrl(repoPath(repo.owner, repo.name, name), false)
     const [graph, files] = await Promise.all([
       api.getGraph(repo.id, name),
       api.listFiles(repo.id, name).catch(() => [] as FileEntry[]),

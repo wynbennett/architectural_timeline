@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useAppStore } from '../../store/useAppStore'
+import { repoPath, useAppStore } from '../../store/useAppStore'
 import { ThemeToggle } from '../layout/ThemeToggle'
 
 export function IntroPage() {
@@ -34,10 +34,17 @@ export function IntroPage() {
         {repos.length === 0 && <p className="muted">{health ? 'Nothing generated yet.' : 'Connecting…'}</p>}
         <div className="repo-grid">
           {repos.map((r) => (
-            <button key={r.id} className="repo-card" onClick={() => { void selectRepo(r.id); openApp() }} disabled={r.generated_count === 0} title={r.generated_count === 0 ? 'no generated tags yet' : `open ${r.owner}/${r.name}`}>
+            <a
+              key={r.id}
+              className={`repo-card${r.generated_count === 0 ? ' disabled' : ''}`}
+              href={repoPath(r.owner, r.name)}
+              onClick={(e) => { e.preventDefault(); if (r.generated_count === 0) return; void selectRepo(r.id); openApp() }}
+              aria-disabled={r.generated_count === 0}
+              title={r.generated_count === 0 ? 'no generated tags yet' : `open ${r.owner}/${r.name}`}
+            >
               <span className="repo-card-name">{r.owner}/<strong>{r.name}</strong></span>
               <span className="repo-card-meta">{r.generated_count} of {r.tag_count} tags generated</span>
-            </button>
+            </a>
           ))}
         </div>
       </section>

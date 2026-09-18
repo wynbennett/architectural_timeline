@@ -2,18 +2,36 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "services": {
     "web": {
-      "root": "frontend/"
+      "root": "frontend/",
+      "rewrites": [
+        {
+          "source": "/r/(.*)",
+          "destination": "/index.html"
+        }
+      ]
     },
     "api": {
       "root": "api/",
       "entrypoint": "index:app",
       "functions": {
-        "index.py": { "maxDuration": 300 }
+        "index.py": {
+          "maxDuration": 300
+        }
       }
     }
   },
   "rewrites": [
-    { "source": "/api/(.*)", "destination": { "service": "api" } },
-    { "source": "/(.*)", "destination": { "service": "web" } }
+    {
+      "source": "/api/(.*)",
+      "destination": {
+        "service": "api"
+      }
+    },
+    {
+      "source": "/(.*)",
+      "destination": {
+        "service": "web"
+      }
+    }
   ]
 }
