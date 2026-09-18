@@ -3,10 +3,13 @@
   "services": {
     "web": {
       "root": "frontend/",
-      "rewrites": [
+      "routes": [
         {
-          "source": "/r/(.*)",
-          "destination": "/index.html"
+          "handle": "filesystem"
+        },
+        {
+          "src": "/r/(.*)",
+          "dest": "/index.html"
         }
       ]
     },
