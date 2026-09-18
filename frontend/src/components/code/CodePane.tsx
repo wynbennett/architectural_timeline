@@ -66,7 +66,7 @@ export function CodePane() {
         <Group orientation="horizontal">
           {showFiles && (
             <>
-              <Panel defaultSize={32} minSize={12} maxSize={90}>
+              <Panel defaultSize="34%" minSize="10%">
                 <div className="code-sidebar">
                   <div className="code-sidebar-head">
                     <span className="muted">{showAllFiles ? 'all files' : scopeLabel} · {treePaths.length}</span>
@@ -80,7 +80,7 @@ export function CodePane() {
               <Separator className="sep sep-v" />
             </>
           )}
-          <Panel minSize={10}>
+          <Panel minSize="5%">
             <div className="code-editor">
               {!openFile ? (
                 <div className="pane-empty">Click a snippet or a file to view code.</div>

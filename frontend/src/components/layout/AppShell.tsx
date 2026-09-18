@@ -42,13 +42,13 @@ export function AppShell() {
       {toast && <div className="banner toast">{toast}</div>}
       <main className="workspace">
         <Group orientation="horizontal">
-          <Panel defaultSize={58} minSize={30}><DiagramPane /></Panel>
+          <Panel defaultSize="58%" minSize="30%"><DiagramPane /></Panel>
           <Separator className="sep sep-v" />
-          <Panel defaultSize={42} minSize={22}>
+          <Panel defaultSize="42%" minSize="22%">
             <Group orientation="vertical">
-              <Panel defaultSize={62} minSize={25}><CodePane /></Panel>
+              <Panel defaultSize="62%" minSize="25%"><CodePane /></Panel>
               <Separator className="sep sep-h" />
-              <Panel defaultSize={38} minSize={15}><ChatPane /></Panel>
+              <Panel defaultSize="38%" minSize="15%"><ChatPane /></Panel>
             </Group>
           </Panel>
         </Group>
