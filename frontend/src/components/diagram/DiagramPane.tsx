@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react'
+import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { Background, Controls, MarkerType, ReactFlow, ReactFlowProvider, useReactFlow, type Edge, type Node } from '@xyflow/react'
 import { useAppStore } from '../../store/useAppStore'
 import { edgeKey, tier3Key, type DiffScope, type GraphEdge, type GraphResponse, type Tier } from '../../types/graph'
@@ -80,19 +80,32 @@ function Canvas() {
     [laid.nodes, selectedNodeId],
   )
 
+  const canvasRef = useRef<HTMLDivElement>(null)
+  const fit = useCallback(() => { void fitView({ padding: 0.15, duration: 200 }) }, [fitView])
+
+  // fit after every layout, once React Flow has measured the new nodes
   useEffect(() => {
     if (laid.key === key && laid.nodes.length) {
-      // wait until React Flow has measured the new nodes (two frames), then fit
       let raf2 = 0
-      const raf1 = window.requestAnimationFrame(() => { raf2 = window.requestAnimationFrame(() => { void fitView({ padding: 0.15, duration: 300 }) }) })
-      const t = window.setTimeout(() => { void fitView({ padding: 0.15, duration: 200 }) }, 250)
+      const raf1 = window.requestAnimationFrame(() => { raf2 = window.requestAnimationFrame(fit) })
+      const t = window.setTimeout(fit, 250)
       return () => { window.cancelAnimationFrame(raf1); window.cancelAnimationFrame(raf2); window.clearTimeout(t) }
     }
-  }, [laid, key, fitView])
+  }, [laid, key, fit])
+
+  // and whenever the canvas itself changes size (panel drag, window resize, late initial layout)
+  useEffect(() => {
+    const el = canvasRef.current
+    if (!el) return
+    let t = 0
+    const ro = new ResizeObserver(() => { window.clearTimeout(t); t = window.setTimeout(fit, 120) })
+    ro.observe(el)
+    return () => { ro.disconnect(); window.clearTimeout(t) }
+  }, [fit])
 
   const empty = laid.key === key && laid.nodes.length === 0
   return (
-    <div className="diagram-canvas">
+    <div className="diagram-canvas" ref={canvasRef}>
       <ReactFlow
         nodes={nodes}
         edges={laid.edges}
