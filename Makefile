@@ -1,4 +1,4 @@
-.PHONY: dev api web test test-api build generate migrate sync
+.PHONY: dev api web test test-api build generate migrate sync remove-repo
 
 api:
 	cd api && .venv/bin/python run.py
@@ -33,3 +33,7 @@ migrate:
 # usage: make sync DB=postgres://... [REPO=owner/name]
 sync:
 	cd api && .venv/bin/python -m app.cli sync-to "$(DB)" $(if $(REPO),--repo $(REPO),)
+
+# usage: make remove-repo REPO=owner/name [DB=postgres://...]
+remove-repo:
+	cd api && .venv/bin/python -m app.cli remove-repo $(REPO) $(if $(DB),--db "$(DB)",)

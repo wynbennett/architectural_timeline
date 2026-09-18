@@ -35,6 +35,10 @@ def main(argv: list[str] | None = None) -> int:
 
     rh = sub.add_parser("rehash", help="fill in blob hashes for inventories generated before hashing existed (needs the local clone)")
 
+    rm = sub.add_parser("remove-repo", help="delete a repo and everything generated for it from a database")
+    rm.add_argument("repo", help="owner/name")
+    rm.add_argument("--db", default=None, help="database URL (default: DATABASE_URL)")
+
     mg = sub.add_parser("migrate", help="create/upgrade the schema on a database (safe to re-run)")
     mg.add_argument("--db", default=None, help="database URL (default: DATABASE_URL)")
 
@@ -47,6 +51,30 @@ def main(argv: list[str] | None = None) -> int:
 
     args = parser.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+
+    if args.cmd == "remove-repo":
+        from sqlalchemy import delete
+        from sqlalchemy.orm import sessionmaker
+
+        from .config import Config
+        from .db import make_engine
+        from .models import ChangeSummary, GenerationJob
+
+        url = args.db or Config.DATABASE_URL
+        owner, _, name = args.repo.partition("/")
+        Session = sessionmaker(bind=make_engine(url), expire_on_commit=False)
+        with Session() as s:
+            repo = s.scalar(select(Repo).where(Repo.owner == owner, Repo.name == name))
+            if repo is None:
+                print(f"no repo {args.repo} on {_redact(url)}", file=sys.stderr)
+                return 1
+            n_tags, n_graphs = len(repo.tags), sum(1 for t in repo.tags if t.graph)
+            s.execute(delete(ChangeSummary).where(ChangeSummary.repo_id == repo.id))
+            s.execute(delete(GenerationJob).where(GenerationJob.repo_id == repo.id))
+            s.delete(repo)  # cascades to tags, graphs, files
+            s.commit()
+        print(f"removed {args.repo} ({n_tags} tags, {n_graphs} graphs) from {_redact(url)}")
+        return 0
 
     if args.cmd == "migrate":
         from .config import Config
