@@ -267,3 +267,14 @@ input:focus, textarea:focus, select:focus { outline: none; border-color: var(--a
 .change-modified { color: var(--mod); border-color: var(--mod); }
 .change-edge { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 10.5px; }
 .compare-counts { display: flex; gap: 8px; align-items: center; padding: 1px 8px; border-radius: 8px; background: var(--bg-2); border: 1px solid var(--border); }
+
+.diff-controls { display: inline-flex; gap: 6px; align-items: center; margin-left: auto; }
+
+/* file tree change markers (compare mode) */
+.tree-row.tree-added .tree-name { color: var(--ok); }
+.tree-row.tree-modified .tree-name { color: var(--mod); }
+.tree-row.tree-removed .tree-name { color: var(--err); text-decoration: line-through; opacity: 0.8; }
+.tree-row.is-dir.tree-modified .tree-name { color: var(--text); }
+.tree-row.is-dir.tree-modified .tree-name::after { content: ''; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--mod); margin-left: 6px; vertical-align: middle; }
+.tree-status { margin-left: auto; font-size: 10px; opacity: 0.9; padding-right: 2px; }
+.sidebar-actions { display: inline-flex; gap: 4px; }

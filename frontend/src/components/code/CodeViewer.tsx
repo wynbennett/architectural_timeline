@@ -3,7 +3,7 @@ import Editor, { type OnMount } from '@monaco-editor/react'
 import type { editor as MonacoEditor } from 'monaco-editor'
 import { useAppStore } from '../../store/useAppStore'
 
-const MONACO_LANG: Record<string, string> = {
+export const MONACO_LANG: Record<string, string> = {
   python: 'python', typescript: 'typescript', javascript: 'javascript', go: 'go', rust: 'rust', java: 'java',
   kotlin: 'kotlin', ruby: 'ruby', php: 'php', csharp: 'csharp', cpp: 'cpp', c: 'c', swift: 'swift', scala: 'scala',
   shell: 'shell', sql: 'sql', html: 'html', css: 'css', scss: 'scss', less: 'less', json: 'json', yaml: 'yaml',

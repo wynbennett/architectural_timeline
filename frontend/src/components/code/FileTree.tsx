@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Tree, type NodeApi, type NodeRendererProps } from 'react-arborist'
 
-export interface TreeItem { id: string; name: string; children?: TreeItem[] }
+export interface TreeItem { id: string; name: string; children?: TreeItem[]; status?: 'added' | 'removed' | 'modified' }
+export type PathStatus = Record<string, 'added' | 'removed' | 'modified'>
 
-export function buildTree(paths: string[]): TreeItem[] {
+export function buildTree(paths: string[], status: PathStatus = {}): TreeItem[] {
   const root: TreeItem[] = []
   const index = new Map<string, TreeItem>()
   for (const p of [...paths].sort()) {
@@ -14,10 +15,12 @@ export function buildTree(paths: string[]): TreeItem[] {
       acc = acc ? `${acc}/${part}` : part
       let node = index.get(acc)
       if (!node) {
-        node = i === parts.length - 1 ? { id: acc, name: part } : { id: acc, name: part, children: [] }
+        node = i === parts.length - 1 ? { id: acc, name: part, status: status[acc] } : { id: acc, name: part, children: [] }
         index.set(acc, node)
         level.push(node)
       }
+      // a folder inherits "modified" when anything under it changed
+      if (node.children && status[p] && !node.status) node.status = 'modified'
       level = node.children ?? level
     })
   }
@@ -34,17 +37,19 @@ function Row({ node, style }: NodeRendererProps<TreeItem>) {
   return (
     <div
       style={style}
-      className={`tree-row${node.isSelected ? ' is-selected' : ''}${isDir ? ' is-dir' : ''}`}
+      className={`tree-row${node.isSelected ? ' is-selected' : ''}${isDir ? ' is-dir' : ''}${node.data.status ? ` tree-${node.data.status}` : ''}`}
       onClick={() => (isDir ? node.toggle() : node.select())}
+      title={node.data.status ? `${node.data.status} since the compare tag` : undefined}
     >
       <span className="tree-caret">{isDir ? (node.isOpen ? '▾' : '▸') : ''}</span>
       <span className="tree-name">{node.data.name}</span>
+      {node.data.status && !isDir && <span className="tree-status">{node.data.status === 'added' ? '+' : node.data.status === 'removed' ? '−' : '✎'}</span>}
     </div>
   )
 }
 
-export function FileTree({ paths, selected, onOpen }: { paths: string[]; selected: string | null; onOpen: (path: string) => void }) {
-  const data = useMemo(() => buildTree(paths), [paths])
+export function FileTree({ paths, selected, onOpen, status = {} }: { paths: string[]; selected: string | null; onOpen: (path: string) => void; status?: PathStatus }) {
+  const data = useMemo(() => buildTree(paths, status), [paths, status])
   const ref = useRef<HTMLDivElement>(null)
   const [size, setSize] = useState({ width: 240, height: 300 })
 

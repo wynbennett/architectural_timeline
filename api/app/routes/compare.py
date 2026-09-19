@@ -8,7 +8,7 @@ from sqlalchemy import select
 from ..config import Config
 from ..db import session_scope
 from ..llm.client import structured_call
-from ..llm.diff import diff_digest, diff_graphs
+from ..llm.diff import changed_files, diff_digest, diff_graphs
 from ..llm.prompts import render_prompt, system_prompt
 from ..models import ChangeSummary, Tag
 from ..ratelimit import rate_limit_response
@@ -44,9 +44,10 @@ def compare(repo_id: int):
         if pair is None:
             return jsonify({"error": "both tags need a generated graph"}), 404
         a, b = pair
-        d = diff_graphs(_graph_dict(b), _graph_dict(a), _files(b), _files(a))
+        fa, fb = _files(a), _files(b)
+        d = diff_graphs(_graph_dict(b), _graph_dict(a), fb, fa)
         cached = s.scalar(select(ChangeSummary).where(ChangeSummary.from_tag_id == a.id, ChangeSummary.to_tag_id == b.id))
-        return jsonify({"from": a.name, "to": b.name, "diff": d, "summary": cached.summary if cached else None})
+        return jsonify({"from": a.name, "to": b.name, "diff": d, "files": changed_files(fb, fa), "summary": cached.summary if cached else None})
 
 
 @bp.post("/repos/<int:repo_id>/compare/summary")

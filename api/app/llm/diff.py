@@ -3,9 +3,10 @@ from __future__ import annotations
 
 from typing import Any
 
-Status = str  # added | removed | changed | modified | unchanged
-#   changed  = the node's paths (or kind / line range) differ: it was re-scoped or moved
-#   modified = same paths, but the content of files under them differs (by blob hash)
+Status = str  # added | removed | modified | changed | unchanged
+#   modified = the code under the node changed (any file under its old or new paths differs by blob hash)
+#   changed  = same code, but the node's paths / kind / line range differ: it was re-scoped or moved.
+#              Content wins over scope: a regrouping by the model is not reported as a code change.
 
 NODE_FIELDS = {
     "tier1": ("name", "kind", "paths"),
@@ -25,12 +26,32 @@ def _under(files: dict[str, str] | None, paths: list[str]) -> dict[str, str]:
     return {p: sha for p, sha in files.items() if any(p == n or p.startswith(n + "/") for n in norm)}
 
 
-def _content_modified(n: dict, cur_files: dict[str, str] | None, prev_files: dict[str, str] | None) -> bool:
-    """Same scope, different bytes: any file under the node's paths (or its single file) changed."""
+def _paths_of(n: dict) -> list[str]:
+    return n.get("paths") or ([n["file_path"]] if n.get("file_path") else [])
+
+
+def _content_modified(cur: dict, prev: dict, cur_files: dict[str, str] | None, prev_files: dict[str, str] | None) -> bool:
+    """Different bytes under the node: compare the files under the union of its old and new paths."""
     if not cur_files or not prev_files:
         return False
-    paths = n.get("paths") or ([n["file_path"]] if n.get("file_path") else [])
+    paths = list(dict.fromkeys(_paths_of(cur) + _paths_of(prev)))
     return _under(cur_files, paths) != _under(prev_files, paths)
+
+
+def _same_scope(cur: dict, prev: dict, cur_files: dict[str, str] | None) -> bool:
+    """Paths spelled differently but covering the same files (and same kind) are not a re-scope."""
+    if not cur_files or "paths" not in cur or cur.get("kind") != prev.get("kind"):
+        return False
+    return set(_under(cur_files, cur["paths"])) == set(_under(cur_files, prev.get("paths", [])))
+
+
+def changed_files(cur_files: dict[str, str], prev_files: dict[str, str]) -> dict[str, list[str]]:
+    """File-level view of the same comparison, for the file tree."""
+    return {
+        "added": sorted(p for p in cur_files if p not in prev_files),
+        "removed": sorted(p for p in prev_files if p not in cur_files),
+        "modified": sorted(p for p in cur_files if p in prev_files and cur_files[p] != prev_files[p]),
+    }
 
 
 def diff_scope(cur: dict | None, prev: dict | None, fields: tuple[str, ...], cur_files: dict[str, str] | None = None, prev_files: dict[str, str] | None = None) -> dict[str, Any]:
@@ -40,10 +61,10 @@ def diff_scope(cur: dict | None, prev: dict | None, fields: tuple[str, ...], cur
     for nid, n in cur_nodes.items():
         if nid not in prev_nodes:
             nodes[nid] = "added"
-        elif any(n.get(f) != prev_nodes[nid].get(f) for f in fields):
-            nodes[nid] = "changed"
-        elif _content_modified(n, cur_files, prev_files):
+        elif _content_modified(n, prev_nodes[nid], cur_files, prev_files):
             nodes[nid] = "modified"
+        elif any(n.get(f) != prev_nodes[nid].get(f) for f in fields) and not _same_scope(n, prev_nodes[nid], cur_files):
+            nodes[nid] = "changed"
         else:
             nodes[nid] = "unchanged"
     for nid in prev_nodes:

@@ -114,3 +114,18 @@ def test_unchanged_components_are_reused(monkeypatch, seeded_repo, fixture_repo)
         assert tag.graph.overview == "# overview"
         assert [m["id"] for m in tag.graph.tier2["api-service"]["nodes"]] == ["core"]
         assert tag.graph.tier3["api-service/core"]["nodes"][0]["id"] == "index"
+
+
+def test_stabilize_paths_keeps_reference_paths_for_same_files(fixture_repo):
+    from app.ingest.workspace import GitWorkspace
+    from app.ingest.inventory import build_inventory
+
+    sha = git.list_tags(fixture_repo)[-1].sha
+    inv = build_inventory(GitWorkspace(fixture_repo, sha))
+    prev_graph = {"tier1": {}, "tier2": {"api-service": {"nodes": [{"id": "core", "name": "Core", "paths": ["api"]}], "edges": []}}, "tier3": {}}
+    ctx = gen.TagContext(ws=GitWorkspace(fixture_repo, sha), owner="acme", name="demo", tag="v0.2.0", sha=sha, inv=inv, prev_tag="v0.1.0", prev_graph=prev_graph)
+    regenerated = Tier2Graph(nodes=[ModuleNode(id="core", name="Core", description="d", paths=["api/app.py"])], edges=[])
+    out = gen._stabilize_paths(ctx, "api-service", regenerated)
+    assert out.nodes[0].paths == ["api"]                     # same single file either way: keep the old spelling
+    other = Tier2Graph(nodes=[ModuleNode(id="core", name="Core", description="d", paths=["worker"])], edges=[])
+    assert gen._stabilize_paths(ctx, "api-service", other).nodes[0].paths == ["worker"]  # different files: a real regroup

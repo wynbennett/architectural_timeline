@@ -222,6 +222,25 @@ def _reusable_tier3(ctx: TagContext, system: SystemNode, module: ModuleNode) -> 
     return Tier3Graph(**ctx.prev_graph["tier3"][key])
 
 
+def _stabilize_paths(ctx: TagContext, system_id: str, g: Tier2Graph) -> Tier2Graph:
+    """When a regenerated module covers exactly the same files as the same module at the
+    reference tag, keep the reference tag's path list. The model may describe one set of
+    files as "api/app/routes" one day and as five file paths the next; that is not a change
+    and should not show up as one in compare mode."""
+    if not ctx.prev_graph or system_id not in ctx.prev_graph["tier2"]:
+        return g
+    prev = {m["id"]: m for m in ctx.prev_graph["tier2"][system_id]["nodes"]}
+    nodes = []
+    for m in g.nodes:
+        p = prev.get(m.id)
+        if p and sorted(p["paths"]) != sorted(m.paths):
+            same_files = {f.path for f in ctx.inv.under(m.paths)} == {f.path for f in ctx.inv.under(p["paths"])}
+            if same_files:
+                m = ModuleNode(id=m.id, name=m.name, description=m.description, paths=list(p["paths"]))
+        nodes.append(m)
+    return Tier2Graph(nodes=nodes, edges=g.edges)
+
+
 def run_tier2(ctx: TagContext, system: SystemNode, siblings: list[SystemNode]) -> Tier2Graph:
     if system.kind == "external":
         return Tier2Graph(nodes=[], edges=[])  # not implemented in this repo; nothing to zoom into
@@ -233,7 +252,7 @@ def run_tier2(ctx: TagContext, system: SystemNode, siblings: list[SystemNode]) -
     if prompt is None:
         return Tier2Graph(nodes=[], edges=[])
     raw = structured_call(ctx.system_prompt, prompt, Tier2Graph)
-    return repair_tier2(raw, ctx.inv, system)
+    return _stabilize_paths(ctx, system.id, repair_tier2(raw, ctx.inv, system))
 
 
 # ---------- tier 3 ----------

@@ -40,5 +40,6 @@ export const tier3Key = (systemId: string, moduleId: string) => `${systemId}/${m
 export type DiffStatus = 'added' | 'removed' | 'changed' | 'modified' | 'unchanged'
 export interface DiffScope { nodes: Record<string, DiffStatus>; edges: Record<string, DiffStatus>; counts: Record<DiffStatus, number>; edge_counts: Record<'added' | 'removed' | 'unchanged', number> }
 export interface DiffResult { tier1: DiffScope; tier2: Record<string, DiffScope>; tier3: Record<string, DiffScope> }
-export interface CompareResult { from: string; to: string; diff: DiffResult; summary: string | null }
+export interface CompareFiles { added: string[]; removed: string[]; modified: string[] }
+export interface CompareResult { from: string; to: string; diff: DiffResult; files: CompareFiles; summary: string | null }
 export const edgeKey = (e: GraphEdge) => `${e.source}|${e.target}|${e.kind}`

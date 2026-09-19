@@ -18,7 +18,7 @@ def test_diff_graphs():
                      "edges": [{"source": "a", "target": "new", "kind": "reads"}]},
            "tier2": {"a": {"nodes": [{"id": "m1", "name": "M1", "paths": ["a/x.py"]}, {"id": "m2", "name": "M2", "paths": ["a/y.py"]}], "edges": []}}, "tier3": {}}
     d = diff_graphs(cur, prev)
-    assert d["tier1"]["nodes"] == {"a": "changed", "new": "added", "gone": "removed"}
+    assert d["tier1"]["nodes"] == {"a": "changed", "new": "added", "gone": "removed"}  # no hashes: paths decide
     assert d["tier1"]["edge_counts"] == {"added": 1, "removed": 1, "unchanged": 0}
     assert d["tier1"]["edges"] == {"a|new|reads": "added", "a|gone|calls": "removed"}
     assert d["tier1"]["counts"]["added"] == 1
@@ -30,6 +30,16 @@ def test_diff_graphs():
     assert same["tier1"]["nodes"] == {"a": "unchanged"}
     mod = diff_graphs(cur2, prev2, {"a/x.py": "222"}, {"a/x.py": "111"})
     assert mod["tier1"]["nodes"] == {"a": "modified"} and mod["tier1"]["counts"]["modified"] == 1
+    # regrouped paths with identical bytes: re-scoped, not modified; regrouped AND edited: modified
+    regrouped = {"tier1": {"nodes": [{"id": "a", "name": "A", "kind": "api", "paths": ["a", "b"]}], "edges": []}, "tier2": {}, "tier3": {}}
+    same_bytes = {"a/x.py": "111", "b/y.py": "333"}
+    assert diff_graphs(regrouped, prev2, same_bytes, same_bytes)["tier1"]["nodes"] == {"a": "changed"}
+    # same files spelled as a directory vs a file list: not a re-scope
+    respelled = {"tier1": {"nodes": [{"id": "a", "name": "A", "kind": "api", "paths": ["a/x.py"]}], "edges": []}, "tier2": {}, "tier3": {}}
+    assert diff_graphs(respelled, prev2, {"a/x.py": "111"}, {"a/x.py": "111"})["tier1"]["nodes"] == {"a": "unchanged"}
+    assert diff_graphs(regrouped, prev2, {"a/x.py": "999", "b/y.py": "333"}, same_bytes)["tier1"]["nodes"] == {"a": "modified"}
+    from app.llm.diff import changed_files
+    assert changed_files({"k": "1", "m": "2", "n": "3"}, {"k": "1", "m": "9", "z": "0"}) == {"added": ["n"], "removed": ["z"], "modified": ["m"]}
     assert diff_graphs(cur2, prev2)["tier1"]["nodes"] == {"a": "unchanged"}  # no hashes: never guesses
     digest = diff_digest(cur, prev, d)
     assert "systems added: N (new)" in digest and "removed: G (gone)" in digest and "modules of A: added: m2" in digest
@@ -44,6 +54,7 @@ def test_compare_routes(seeded_repo):
     assert r.status_code == 200
     body = r.get_json()
     assert body["from"] == "v0.1.0" and body["to"] == "v0.2.0" and body["summary"] is None
+    assert body["files"]["added"] == ["worker/main.py"] and body["files"]["modified"] == [] and body["files"]["removed"] == []
     assert set(body["diff"]["tier1"]["nodes"]) == {"api-service", "worker", "db"}
     assert c.get(f"/api/repos/{repo_id}/compare", query_string={"from": "v0.1.0", "to": "nope"}).status_code == 404
 
